@@ -224,6 +224,22 @@ function modeText(snr100w) {
   ];
 }
 
+function modeRank(snr100w) {
+  if (Number.isNaN(Number(snr100w))) return 0;
+  if (snr100w >= 6) return 3;
+  if (snr100w >= -12) return 2;
+  if (snr100w >= -20) return 1;
+  return 0;
+}
+
+function modeSummary(snr100w) {
+  const rank = modeRank(snr100w);
+  if (rank >= 3) return "SSB/CW/FT8 likely at 100W";
+  if (rank >= 2) return "CW/FT8 likely at 100W";
+  if (rank >= 1) return "FT8 likely at 100W";
+  return "Below FT8 threshold at 100W";
+}
+
 function scaledText(snr, powerDbm) {
   if (Number.isNaN(Number(snr)) || Number.isNaN(Number(powerDbm))) return "100W estimate unavailable";
   const estimate = scaledSnr(snr, powerDbm);
@@ -635,17 +651,38 @@ function renderBandChances(rows) {
 
   const chances = [...byBand.entries()].map(([band, data]) => {
     const hourMap = new Map(data.rows.map((row) => [Number(row.hour), row]));
-    let bestWindow = { start: 0, spots: -1, best: data.rows[0] };
+    let bestWindow = { start: 0, spots: -1, best: data.rows[0], snr100w: -Infinity, mode: 0 };
     for (let start = 0; start < 24; start += 1) {
       const windowRows = [0, 1, 2].map((offset) => hourMap.get((start + offset) % 24)).filter(Boolean);
       const spots = windowRows.reduce((sum, row) => sum + Number(row.spots), 0);
       const best = windowRows.sort((a, b) => Number(b.best_snr) - Number(a.best_snr))[0] || data.rows[0];
-      if (spots > bestWindow.spots) bestWindow = { start, spots, best };
+      const snr100w = scaledSnr(best.best_snr, best.best_power);
+      const mode = modeRank(snr100w);
+      if (
+        mode > bestWindow.mode ||
+        (mode === bestWindow.mode && snr100w > bestWindow.snr100w) ||
+        (mode === bestWindow.mode && snr100w === bestWindow.snr100w && spots > bestWindow.spots)
+      ) {
+        bestWindow = { start, spots, best, snr100w, mode };
+      }
     }
     const end = (bestWindow.start + 3) % 24;
     const windowText = `${String(bestWindow.start).padStart(2, "0")}:00-${String(end).padStart(2, "0")}:00 UTC`;
-    return { band, best: bestWindow.best, total: data.total, windowSpots: bestWindow.spots, windowText };
-  }).sort((a, b) => b.windowSpots - a.windowSpots);
+    return {
+      band,
+      best: bestWindow.best,
+      total: data.total,
+      windowSpots: bestWindow.spots,
+      windowText,
+      snr100w: bestWindow.snr100w,
+      mode: bestWindow.mode
+    };
+  }).sort((a, b) =>
+    b.mode - a.mode ||
+    b.snr100w - a.snr100w ||
+    b.windowSpots - a.windowSpots ||
+    b.total - a.total
+  );
 
   els.bandChanceList.innerHTML = chances.length ? chances.map((chance) => `
     <li>
@@ -653,7 +690,7 @@ function renderBandChances(rows) {
         <span>${bandLabel(chance.band)} best chance</span>
         <span>${chance.windowText}</span>
       </div>
-      <div class="slot-sub">${Number(chance.windowSpots).toLocaleString()} spots in this 3h window, ${chance.total.toLocaleString()} total, best SNR ${chance.best.best_snr} dB</div>
+      <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 3h window, ${chance.total.toLocaleString()} total, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
       <div class="mode-hint">${scaledText(chance.best.best_snr, chance.best.best_power)}</div>
     </li>
   `).join("") : `<li>No per-band openings found.</li>`;
