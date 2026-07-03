@@ -175,12 +175,18 @@ function endpointPoint(box, endpoint) {
 function renderPathMap(a, b, endpoints = null) {
   const aCenter = endpointPoint(a, endpoints?.a);
   const bCenter = endpointPoint(b, endpoints?.b);
-  const viewWidth = 1792;
+  const viewWidth = 1536;
   const viewHeight = 1024;
-  const mapFrame = { x: 56, y: 35, width: 1680, height: 856 };
+  const mapFrame = { x: 0, y: 0, width: 1536, height: 1024 };
+  const projectLat = (lat) => {
+    const clamped = Math.max(-90, Math.min(90, lat));
+    const radians = clamped * Math.PI / 180;
+    const robinsonish = Math.sign(clamped) * Math.pow(Math.abs(Math.sin(radians)), 0.78);
+    return mapFrame.y + (0.5 - robinsonish * 0.5) * mapFrame.height;
+  };
   const mapProject = (point) => ({
     x: mapFrame.x + ((point.lon + 180) / 360) * mapFrame.width,
-    y: mapFrame.y + ((90 - Math.max(-90, Math.min(90, point.lat))) / 180) * mapFrame.height
+    y: projectLat(point.lat)
   });
   const aPoint = mapProject(aCenter);
   const bPoint = mapProject(bCenter);
@@ -189,7 +195,7 @@ function renderPathMap(a, b, endpoints = null) {
   const curve = Math.min(190, Math.max(70, Math.hypot(dx, dy) * 0.16));
   const midX = (aPoint.x + bPoint.x) / 2;
   const midY = (aPoint.y + bPoint.y) / 2 - curve;
-  const labelX = (point) => Math.min(viewWidth - 220, Math.max(24, point.x + 18));
+  const labelX = (point) => Math.min(viewWidth - 240, Math.max(24, point.x + 18));
   const labelY = (point) => Math.min(viewHeight - 30, Math.max(36, point.y - 16));
   const basis = endpoints?.source ? ` (${endpoints.source})` : "";
   els.mapMeta.textContent = `${a.name} to ${b.name}${basis}`;
