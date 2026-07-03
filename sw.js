@@ -1,5 +1,5 @@
-const cacheName = "wspr-path-checker-v13";
-const appFiles = ["./", "./index.html", "./styles.css?v=13", "./app.js?v=13", "./manifest.webmanifest", "./icon.svg", "./world-map.png"];
+const cacheName = "wsprspydx-v14";
+const appFiles = ["./", "./index.html", "./styles.css?v=14", "./app.js?v=14", "./manifest.webmanifest", "./icon.svg", "./world-map.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(cacheName).then((cache) => cache.addAll(appFiles)));

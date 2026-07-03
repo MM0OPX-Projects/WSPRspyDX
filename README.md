@@ -5,12 +5,14 @@ WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagatio
 The project is available in two formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
-- **Android APK**: `releases/WSPRSpyDX-v0.2-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.3-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
 
 ## Features
 
 - Queries historical WSPR spots from the public WSPR Live ClickHouse endpoint.
 - Lets you type countries or major regions for each end of the path.
+- Adds path modes for country/region, CQ zone, ITU zone, and Maidenhead locator searches.
+- Supports multiple target zones or locators, for example `14` to `1,2`.
 - Includes shortcuts for Scotland, New Zealand, USA East Coast, USA West Coast, and other common regions.
 - Supports history windows from recent days up to longer lookbacks.
 - Shows best bands and best UTC operating windows by band.
@@ -20,6 +22,7 @@ The project is available in two formats:
 - Adds a NOAA/SWPC geomagnetic activity warning when recent Kp may make current HF conditions differ from the historical pattern.
 - Uses a bundled local world map image with a curved path between the selected regions.
 - Provides editable latitude/longitude boxes for manual region tuning.
+- Uses a dark, card-based phone layout inspired by RiverWatch Scotland.
 
 ## Data Sources
 
@@ -31,6 +34,8 @@ WSPRSpyDX uses live internet data:
 - Country and region lookup fallback: Nominatim geocoding
 
 The map image is bundled locally. The dashboard does not depend on OpenStreetMap map tiles.
+
+CQ and ITU zone searches are converted into practical latitude/longitude search areas because WSPR Live does not expose CQ or ITU zone columns in `wspr.rx`. Maidenhead locator searches are converted directly from the locator grid.
 
 ## Run The HTML Version Locally
 
@@ -71,7 +76,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.2-debug.apk
+releases/WSPRSpyDX-v0.3-debug.apk
 ```
 
 To install it on Android:
@@ -107,7 +112,7 @@ The current test APK was built locally from this wrapper and the dashboard asset
 ├── world-map.png
 ├── android-apk/
 └── releases/
-    └── WSPRSpyDX-v0.2-debug.apk
+    └── WSPRSpyDX-v0.3-debug.apk
 ```
 
 ## Notes

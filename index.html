@@ -5,41 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#172033">
   <title>WSPRSpyDX</title>
+  <style>
+    body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
+  </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
-  <main class="app">
-    <header class="topbar">
-      <div>
-        <h1>WSPRSpyDX</h1>
+  <main class="wrap">
+    <header class="appHeader">
+      <div class="top">
+        <div class="title">
+          <h1>WSPRSpyDX</h1>
+          <p>Historical WSPR path reckoner for DX, bands, UTC windows, and 100 W mode estimates.</p>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" type="button" aria-label="Refresh data" title="Refresh data">Refresh</button>
+        </div>
       </div>
-      <button class="icon-button" id="refreshBtn" type="button" aria-label="Refresh data" title="Refresh data">&#8635;</button>
-    </header>
-
-    <section class="panel controls" aria-label="Path controls">
-      <div class="country-grid">
-        <label>
-          <span>Region A</span>
-          <div class="combo">
-            <input id="aCountry" list="aCountryOptions" autocomplete="off" value="Scotland" aria-label="Region A country or area">
-            <datalist id="aCountryOptions"></datalist>
-            <div class="suggestions" id="aSuggestions" role="listbox"></div>
-          </div>
-        </label>
-        <label>
-          <span>Region B</span>
-          <div class="combo">
-            <input id="bCountry" list="bCountryOptions" autocomplete="off" value="New Zealand" aria-label="Region B country or area">
-            <datalist id="bCountryOptions"></datalist>
-            <div class="suggestions" id="bSuggestions" role="listbox"></div>
-          </div>
-        </label>
-      </div>
-
-      <div class="control-grid">
-        <label>
-          <span>History</span>
+      <div class="selectors" aria-label="Path controls">
+        <div class="selectBox">
+          <label for="pathMode">Path type</label>
+          <select id="pathMode">
+            <option value="country" selected>Country / region</option>
+            <option value="cq">CQ zone</option>
+            <option value="itu">ITU zone</option>
+            <option value="locator">Maidenhead locator</option>
+          </select>
+        </div>
+        <div class="selectBox">
+          <label for="period">History</label>
           <select id="period">
             <option value="1">1 day</option>
             <option value="2">2 days</option>
@@ -51,18 +46,42 @@
             <option value="30">30 days</option>
             <option value="90" selected>90 days</option>
           </select>
-        </label>
-        <label>
-          <span>Direction</span>
+        </div>
+        <div class="selectBox">
+          <label id="aInputLabel" for="aCountry">Region A</label>
+          <div class="combo">
+            <input id="aCountry" list="aCountryOptions" autocomplete="off" value="Scotland" aria-label="Region A country or area">
+            <datalist id="aCountryOptions"></datalist>
+            <div class="suggestions" id="aSuggestions" role="listbox"></div>
+          </div>
+        </div>
+        <div class="selectBox">
+          <label id="bInputLabel" for="bCountry">Region B</label>
+          <div class="combo">
+            <input id="bCountry" list="bCountryOptions" autocomplete="off" value="New Zealand" aria-label="Region B country or area">
+            <datalist id="bCountryOptions"></datalist>
+            <div class="suggestions" id="bSuggestions" role="listbox"></div>
+          </div>
+        </div>
+        <div class="selectBox">
+          <label for="direction">Direction</label>
           <select id="direction">
             <option value="both" selected>Both ways</option>
             <option value="ab">A heard in B</option>
             <option value="ba">B heard in A</option>
           </select>
-        </label>
+        </div>
+        <div class="selectBox runBox">
+          <label>&nbsp;</label>
+          <button id="runBtn" class="primary" type="button">Run path check</button>
+        </div>
       </div>
+      <p class="modeNote" id="modeNote">Type countries or regions such as Scotland, New Zealand, USA East Coast, or Japan.</p>
+    </header>
 
-      <details id="customDetails">
+    <section class="status" id="status" role="status">Ready.</section>
+
+    <details class="panel customPanel" id="customDetails">
         <summary>Region boxes</summary>
         <div class="box-editor">
           <fieldset>
@@ -88,12 +107,16 @@
         </div>
       </details>
 
-      <button id="runBtn" class="primary" type="button">Run path check</button>
+    <div class="grid">
+    <section class="card mapCard">
+      <div class="section-head">
+        <h2>Path Map</h2>
+        <span id="mapMeta"></span>
+      </div>
+      <div class="path-map" id="pathMap" aria-label="Selected radio path map"></div>
     </section>
 
-    <section class="status" id="status" role="status">Ready.</section>
-
-    <section class="space-weather quiet" id="spaceWeather" aria-label="Space weather">
+    <section class="card weatherCard space-weather quiet" id="spaceWeather" aria-label="Space weather">
       <div>
         <span class="weather-label">Space weather</span>
         <strong id="spaceWeatherTitle">Checking NOAA Kp...</strong>
@@ -103,15 +126,7 @@
 
     <section class="score-strip" id="scoreStrip" aria-label="Band summary"></section>
 
-    <section class="panel">
-      <div class="section-head">
-        <h2>Path Map</h2>
-        <span id="mapMeta"></span>
-      </div>
-      <div class="path-map" id="pathMap" aria-label="Selected radio path map"></div>
-    </section>
-
-    <section class="panel">
+    <section class="card heatmapCard">
       <div class="section-head">
         <h2>UTC Windows</h2>
         <span id="queryMeta"></span>
@@ -121,7 +136,7 @@
       </div>
     </section>
 
-    <section class="panel">
+    <section class="card slotCard">
       <div class="section-head">
         <h2>Best Slots</h2>
         <span>ranked by spot count</span>
@@ -129,7 +144,7 @@
       <ol class="slot-list" id="slotList"></ol>
     </section>
 
-    <section class="panel">
+    <section class="card bandCard">
       <div class="section-head">
         <h2>Best By Band</h2>
         <span>best 3h UTC window</span>
@@ -137,19 +152,20 @@
       <ol class="slot-list" id="bandChanceList"></ol>
     </section>
 
-    <section class="panel">
+    <section class="card latestCard">
       <div class="section-head">
         <h2>Latest Spots</h2>
         <span id="latestMeta"></span>
       </div>
       <div class="latest" id="latest"></div>
     </section>
+    </div>
 
     <footer class="source-note">
       Data sources: <a href="https://wspr.live/" target="_blank" rel="noopener">WSPR Live</a> and NOAA/SWPC.
       100W estimates scale WSPR SNR by reported TX power.
     </footer>
   </main>
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

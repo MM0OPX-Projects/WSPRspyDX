@@ -34,6 +34,33 @@ const knownRegions = {
   brazil: { name: "Brazil", lat: -10.8, lon: -53.1, latMin: -33.8, latMax: 5.3, lonMin: -73.9, lonMax: -34.7 }
 };
 
+const specialCqZones = {
+  1: { name: "CQ Zone 1 - Northwest North America", lat: 50, lon: -145, latMin: 45, latMax: 90, lonMin: -170, lonMax: -115 },
+  2: { name: "CQ Zone 2 - Northeast North America", lat: 55, lon: -75, latMin: 45, latMax: 90, lonMin: -115, lonMax: -45 },
+  3: { name: "CQ Zone 3 - Western USA/Canada", lat: 39, lon: -119, latMin: 25, latMax: 55, lonMin: -130, lonMax: -108 },
+  4: { name: "CQ Zone 4 - Central North America", lat: 40, lon: -96, latMin: 24, latMax: 56, lonMin: -110, lonMax: -84 },
+  5: { name: "CQ Zone 5 - Eastern North America", lat: 40, lon: -74, latMin: 24, latMax: 56, lonMin: -86, lonMax: -58 },
+  14: { name: "CQ Zone 14 - Western Europe", lat: 52, lon: 2, latMin: 35, latMax: 62, lonMin: -12, lonMax: 16 },
+  15: { name: "CQ Zone 15 - Central Europe", lat: 49, lon: 18, latMin: 35, latMax: 62, lonMin: 10, lonMax: 32 },
+  16: { name: "CQ Zone 16 - Eastern Europe", lat: 52, lon: 37, latMin: 40, latMax: 70, lonMin: 28, lonMax: 60 },
+  25: { name: "CQ Zone 25 - Japan", lat: 37, lon: 138, latMin: 30, latMax: 46, lonMin: 129, lonMax: 146 },
+  27: { name: "CQ Zone 27 - Philippines region", lat: 13, lon: 122, latMin: 4, latMax: 22, lonMin: 116, lonMax: 128 },
+  30: { name: "CQ Zone 30 - Australia", lat: -25, lon: 134, latMin: -44, latMax: -10, lonMin: 112, lonMax: 154 },
+  32: { name: "CQ Zone 32 - New Zealand/Pacific", lat: -36, lon: 174, latMin: -50, latMax: -10, lonMin: 160, lonMax: 180 }
+};
+
+const specialItuZones = {
+  1: { name: "ITU Zone 1 - Northwest North America", lat: 62, lon: -150, latMin: 50, latMax: 90, lonMin: -170, lonMax: -125 },
+  2: { name: "ITU Zone 2 - Northern North America", lat: 58, lon: -105, latMin: 45, latMax: 75, lonMin: -130, lonMax: -80 },
+  6: { name: "ITU Zone 6 - Eastern North America", lat: 40, lon: -75, latMin: 25, latMax: 55, lonMin: -90, lonMax: -58 },
+  27: { name: "ITU Zone 27 - UK/Ireland/Western Europe", lat: 55, lon: -4, latMin: 49, latMax: 61.5, lonMin: -11, lonMax: 3 },
+  28: { name: "ITU Zone 28 - Western/Central Europe", lat: 49, lon: 9, latMin: 42, latMax: 58, lonMin: 0, lonMax: 18 },
+  29: { name: "ITU Zone 29 - Northern Europe", lat: 60, lon: 18, latMin: 55, latMax: 72, lonMin: 5, lonMax: 32 },
+  45: { name: "ITU Zone 45 - Japan", lat: 37, lon: 138, latMin: 30, latMax: 46, lonMin: 129, lonMax: 146 },
+  59: { name: "ITU Zone 59 - New Zealand", lat: -41, lon: 173, latMin: -48, latMax: -34, lonMin: 166, lonMax: 180 },
+  60: { name: "ITU Zone 60 - Eastern Australia", lat: -27, lon: 145, latMin: -44, latMax: -10, lonMin: 136, lonMax: 154 }
+};
+
 const geocodeCache = new Map();
 const countryTimers = new Map();
 
@@ -45,11 +72,15 @@ const bandLabels = new Map([
 
 const els = {
   aCountry: document.querySelector("#aCountry"),
+  aInputLabel: document.querySelector("#aInputLabel"),
   aCountryOptions: document.querySelector("#aCountryOptions"),
   aSuggestions: document.querySelector("#aSuggestions"),
   bCountry: document.querySelector("#bCountry"),
+  bInputLabel: document.querySelector("#bInputLabel"),
   bCountryOptions: document.querySelector("#bCountryOptions"),
   bSuggestions: document.querySelector("#bSuggestions"),
+  pathMode: document.querySelector("#pathMode"),
+  modeNote: document.querySelector("#modeNote"),
   period: document.querySelector("#period"),
   direction: document.querySelector("#direction"),
   refreshBtn: document.querySelector("#refreshBtn"),
@@ -93,14 +124,27 @@ function setStatus(message, isError = false) {
   els.status.classList.toggle("error", isError);
 }
 
+function boundingBox(boxes) {
+  const list = boxes.filter(Boolean);
+  return {
+    latMin: Math.min(...list.map((box) => Number(box.latMin))),
+    latMax: Math.max(...list.map((box) => Number(box.latMax))),
+    lonMin: Math.min(...list.map((box) => Number(box.lonMin))),
+    lonMax: Math.max(...list.map((box) => Number(box.lonMax)))
+  };
+}
+
 function fillBox(prefix, box) {
+  const boxes = box.boxes || [box];
+  const bounds = boundingBox(boxes);
   els[`${prefix}Name`].value = box.name;
   els[`${prefix}Name`].dataset.lat = box.lat ?? "";
   els[`${prefix}Name`].dataset.lon = box.lon ?? "";
-  els[`${prefix}LatMin`].value = box.latMin;
-  els[`${prefix}LatMax`].value = box.latMax;
-  els[`${prefix}LonMin`].value = box.lonMin;
-  els[`${prefix}LonMax`].value = box.lonMax;
+  els[`${prefix}Name`].dataset.boxes = JSON.stringify(boxes);
+  els[`${prefix}LatMin`].value = bounds.latMin;
+  els[`${prefix}LatMax`].value = bounds.latMax;
+  els[`${prefix}LonMin`].value = bounds.lonMin;
+  els[`${prefix}LonMax`].value = bounds.lonMax;
   updateMapFromBoxes();
 }
 
@@ -169,6 +213,95 @@ function scaledText(snr, powerDbm) {
     <span class="estimate">100W est ${estimate >= 0 ? "+" : ""}${estimate.toFixed(0)} dB</span>
     ${modeText(estimate).map((mode) => `<span class="mode-chip ${mode.ok ? "ok" : "no"}">${mode.name}</span>`).join("")}
   `;
+}
+
+function fallbackZoneBox(kind, zone) {
+  if (kind === "cq") {
+    const width = 360 / 40;
+    const lonMin = -180 + (zone - 1) * width;
+    const lonMax = lonMin + width;
+    return { name: `CQ Zone ${zone} - approximate`, lat: 0, lon: (lonMin + lonMax) / 2, latMin: -60, latMax: 75, lonMin, lonMax };
+  }
+  const columns = 15;
+  const rows = 6;
+  const index = zone - 1;
+  const row = Math.floor(index / columns);
+  const col = index % columns;
+  const lonWidth = 360 / columns;
+  const latHeight = 180 / rows;
+  const lonMin = -180 + col * lonWidth;
+  const lonMax = lonMin + lonWidth;
+  const latMax = 90 - row * latHeight;
+  const latMin = latMax - latHeight;
+  return { name: `ITU Zone ${zone} - approximate`, lat: (latMin + latMax) / 2, lon: (lonMin + lonMax) / 2, latMin, latMax, lonMin, lonMax };
+}
+
+function parseZones(value, kind) {
+  const max = kind === "cq" ? 40 : 90;
+  const specials = kind === "cq" ? specialCqZones : specialItuZones;
+  const zones = [...new Set(String(value).match(/\d+/g)?.map(Number) || [])].filter((zone) => zone >= 1 && zone <= max);
+  if (!zones.length) throw new Error(`Enter one or more ${kind.toUpperCase()} zone numbers, for example 14 or 1,2.`);
+  const boxes = zones.map((zone) => specials[zone] || fallbackZoneBox(kind, zone));
+  const bounds = boundingBox(boxes);
+  return {
+    name: `${kind.toUpperCase()} ${zones.join(", ")}`,
+    lat: (bounds.latMin + bounds.latMax) / 2,
+    lon: (bounds.lonMin + bounds.lonMax) / 2,
+    ...bounds,
+    boxes
+  };
+}
+
+function locatorBox(locator) {
+  const clean = String(locator).trim().toUpperCase();
+  if (!/^[A-R]{2}([0-9]{2})?([A-X]{2})?([0-9]{2})?$/.test(clean) || clean.length < 2 || clean.length % 2 !== 0) {
+    throw new Error(`"${locator}" is not a valid 2, 4, 6, or 8 character Maidenhead locator.`);
+  }
+  let lon = (clean.charCodeAt(0) - 65) * 20 - 180;
+  let lat = (clean.charCodeAt(1) - 65) * 10 - 90;
+  let lonSize = 20;
+  let latSize = 10;
+  if (clean.length >= 4) {
+    lon += Number(clean[2]) * 2;
+    lat += Number(clean[3]);
+    lonSize = 2;
+    latSize = 1;
+  }
+  if (clean.length >= 6) {
+    lon += (clean.charCodeAt(4) - 65) * (2 / 24);
+    lat += (clean.charCodeAt(5) - 65) * (1 / 24);
+    lonSize = 2 / 24;
+    latSize = 1 / 24;
+  }
+  if (clean.length >= 8) {
+    lon += Number(clean[6]) * (lonSize / 10);
+    lat += Number(clean[7]) * (latSize / 10);
+    lonSize /= 10;
+    latSize /= 10;
+  }
+  return {
+    name: `Locator ${clean}`,
+    lat: lat + latSize / 2,
+    lon: lon + lonSize / 2,
+    latMin: lat,
+    latMax: lat + latSize,
+    lonMin: lon,
+    lonMax: lon + lonSize
+  };
+}
+
+function parseLocators(value) {
+  const locators = String(value).split(/[,\s]+/).map((item) => item.trim()).filter(Boolean);
+  if (!locators.length) throw new Error("Enter one or more Maidenhead locators, for example IO75 or IO75, RF72.");
+  const boxes = locators.map(locatorBox);
+  const bounds = boundingBox(boxes);
+  return {
+    name: locators.map((item) => item.toUpperCase()).join(", "),
+    lat: (bounds.latMin + bounds.latMax) / 2,
+    lon: (bounds.lonMin + bounds.lonMax) / 2,
+    ...bounds,
+    boxes
+  };
 }
 
 function boxFromResult(result) {
@@ -273,6 +406,7 @@ async function resolveCountry(prefix, shouldReport = true) {
 }
 
 function scheduleCountryLookup(prefix) {
+  if (els.pathMode.value !== "country") return;
   clearTimeout(countryTimers.get(prefix));
   countryTimers.set(prefix, setTimeout(() => resolveCountry(prefix), 450));
 }
@@ -284,6 +418,12 @@ function chooseSuggestion(prefix, label) {
 }
 
 function readBox(prefix) {
+  let boxes = [];
+  try {
+    boxes = JSON.parse(els[`${prefix}Name`].dataset.boxes || "[]");
+  } catch (error) {
+    boxes = [];
+  }
   const box = {
     name: els[`${prefix}Name`].value.trim() || `Region ${prefix.toUpperCase()}`,
     lat: Number(els[`${prefix}Name`].dataset.lat),
@@ -291,16 +431,19 @@ function readBox(prefix) {
     latMin: Number(els[`${prefix}LatMin`].value),
     latMax: Number(els[`${prefix}LatMax`].value),
     lonMin: Number(els[`${prefix}LonMin`].value),
-    lonMax: Number(els[`${prefix}LonMax`].value)
+    lonMax: Number(els[`${prefix}LonMax`].value),
+    boxes
   };
   if ([box.latMin, box.latMax, box.lonMin, box.lonMax].some((value) => Number.isNaN(value))) {
     throw new Error("Please check the latitude/longitude boxes.");
   }
+  if (!box.boxes.length) box.boxes = [{ name: box.name, latMin: box.latMin, latMax: box.latMax, lonMin: box.lonMin, lonMax: box.lonMax }];
   return box;
 }
 
 function regionWhere(prefix, box) {
-  return `${prefix}_lat BETWEEN ${box.latMin} AND ${box.latMax} AND ${prefix}_lon BETWEEN ${box.lonMin} AND ${box.lonMax}`;
+  const boxes = box.boxes?.length ? box.boxes : [box];
+  return `(${boxes.map((part) => `${prefix}_lat BETWEEN ${part.latMin} AND ${part.latMax} AND ${prefix}_lon BETWEEN ${part.lonMin} AND ${part.lonMax}`).join(" OR ")})`;
 }
 
 function pathWhere(a, b) {
@@ -466,6 +609,7 @@ function renderLatest(rows) {
 
 async function run() {
   try {
+    await resolveCurrentInputs(false);
     const a = readBox("a");
     const b = readBox("b");
     const days = Math.min(90, Math.max(1, Number(els.period.value)));
@@ -515,10 +659,94 @@ async function run() {
   }
 }
 
-els.aCountry.addEventListener("input", () => scheduleCountryLookup("a"));
-els.bCountry.addEventListener("input", () => scheduleCountryLookup("b"));
-els.aCountry.addEventListener("change", () => resolveCountry("a"));
-els.bCountry.addEventListener("change", () => resolveCountry("b"));
+function resolveStructuredInput(prefix, shouldReport = true) {
+  const mode = els.pathMode.value;
+  const value = els[`${prefix}Country`].value.trim();
+  if (!value) throw new Error(`Enter a ${mode === "locator" ? "Maidenhead locator" : `${mode.toUpperCase()} zone`} for Region ${prefix.toUpperCase()}.`);
+  const box = mode === "locator" ? parseLocators(value) : parseZones(value, mode);
+  fillBox(prefix, box);
+  els[`${prefix}Suggestions`].classList.remove("open");
+  if (shouldReport) setStatus(`Matched Region ${prefix.toUpperCase()} to ${box.name}.`);
+  return box;
+}
+
+async function resolvePathInput(prefix, shouldReport = true) {
+  if (els.pathMode.value === "country") return resolveCountry(prefix, shouldReport);
+  return resolveStructuredInput(prefix, shouldReport);
+}
+
+async function resolveCurrentInputs(shouldReport = true) {
+  await resolvePathInput("a", shouldReport);
+  await resolvePathInput("b", shouldReport);
+}
+
+function updateModeUi() {
+  const mode = els.pathMode.value;
+  els.aSuggestions.classList.remove("open");
+  els.bSuggestions.classList.remove("open");
+  els.aCountryOptions.innerHTML = "";
+  els.bCountryOptions.innerHTML = "";
+
+  if (mode === "country") {
+    els.aInputLabel.textContent = "Region A";
+    els.bInputLabel.textContent = "Region B";
+    els.aCountry.placeholder = "Scotland";
+    els.bCountry.placeholder = "New Zealand";
+    els.modeNote.textContent = "Type countries or regions such as Scotland, New Zealand, USA East Coast, or Japan.";
+    if (!els.aCountry.value.trim()) els.aCountry.value = "Scotland";
+    if (!els.bCountry.value.trim()) els.bCountry.value = "New Zealand";
+    resolveCurrentInputs(false);
+    return;
+  }
+
+  if (mode === "cq") {
+    els.aInputLabel.textContent = "CQ zone A";
+    els.bInputLabel.textContent = "CQ zone B";
+    els.aCountry.placeholder = "14";
+    els.bCountry.placeholder = "1,2";
+    els.modeNote.textContent = "Enter one or more CQ zones. Multiple zones can be comma separated, for example 14 to 1,2.";
+    els.aCountry.value = "14";
+    els.bCountry.value = "1,2";
+  } else if (mode === "itu") {
+    els.aInputLabel.textContent = "ITU zone A";
+    els.bInputLabel.textContent = "ITU zone B";
+    els.aCountry.placeholder = "27";
+    els.bCountry.placeholder = "1,2";
+    els.modeNote.textContent = "Enter one or more ITU zones. WSPR Live has no zone column, so zones are converted to practical lat/lon areas.";
+    els.aCountry.value = "27";
+    els.bCountry.value = "1,2";
+  } else {
+    els.aInputLabel.textContent = "Locator A";
+    els.bInputLabel.textContent = "Locator B";
+    els.aCountry.placeholder = "IO75";
+    els.bCountry.placeholder = "RF72";
+    els.modeNote.textContent = "Enter Maidenhead locators. Use 4 or 6 characters for practical area searches; multiple locators can be comma separated.";
+    els.aCountry.value = "IO75";
+    els.bCountry.value = "RF72";
+  }
+
+  try {
+    resolveCurrentInputs(false);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+els.pathMode.addEventListener("change", updateModeUi);
+els.aCountry.addEventListener("input", () => {
+  if (els.pathMode.value === "country") scheduleCountryLookup("a");
+  else {
+    try { resolveStructuredInput("a", false); } catch (error) {}
+  }
+});
+els.bCountry.addEventListener("input", () => {
+  if (els.pathMode.value === "country") scheduleCountryLookup("b");
+  else {
+    try { resolveStructuredInput("b", false); } catch (error) {}
+  }
+});
+els.aCountry.addEventListener("change", () => resolvePathInput("a"));
+els.bCountry.addEventListener("change", () => resolvePathInput("b"));
 els.aSuggestions.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button) chooseSuggestion("a", button.dataset.name);
@@ -545,5 +773,6 @@ if ("serviceWorker" in navigator) {
 
 fillBox("a", knownRegions.scotland);
 fillBox("b", knownRegions["new zealand"]);
+updateModeUi();
 loadSpaceWeather();
 run();
