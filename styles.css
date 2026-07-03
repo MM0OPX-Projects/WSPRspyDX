@@ -280,7 +280,7 @@ fieldset {
 }
 
 .mapCard {
-  grid-column: span 8;
+  grid-column: span 12;
 }
 
 .weatherCard {
@@ -323,12 +323,13 @@ h2 {
 
 .space-weather {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   align-content: start;
-  align-items: center;
-  gap: 22px;
+  justify-items: center;
+  gap: 18px;
   border-left-width: 5px;
-  padding: 20px;
+  padding: 22px;
+  text-align: center;
 }
 
 .space-weather.quiet {
@@ -350,16 +351,17 @@ h2 {
 }
 
 .space-weather p {
-  max-width: 980px;
-  margin: 8px 0 0;
+  width: 100%;
+  max-width: 1020px;
+  margin: 10px auto 0;
   color: var(--muted);
   font-size: clamp(1rem, 3.5vw, 1.24rem);
   line-height: 1.45;
 }
 
 .weatherGauge {
-  width: clamp(156px, 22vw, 210px);
-  height: clamp(156px, 22vw, 210px);
+  width: clamp(190px, 28vw, 280px);
+  height: clamp(190px, 28vw, 280px);
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -379,7 +381,7 @@ h2 {
 .weatherGauge:after {
   content: "";
   position: absolute;
-  inset: 15px;
+  inset: 18px;
   border-radius: 50%;
   background: #101a2d;
 }
@@ -407,6 +409,7 @@ h2 {
 }
 
 .weatherCopy {
+  width: 100%;
   min-width: 0;
 }
 
@@ -673,12 +676,9 @@ h2 {
   }
 
   .space-weather {
-    grid-template-columns: 1fr;
     border-left-width: 1px;
     border-top-width: 5px;
-    padding: 14px;
-    text-align: center;
-    justify-items: center;
+    padding: 18px 14px;
     gap: 18px;
   }
 
@@ -688,9 +688,8 @@ h2 {
   }
 
   .weatherGauge {
-    width: min(72vw, 260px);
-    height: min(72vw, 260px);
-    order: 2;
+    width: min(78vw, 290px);
+    height: min(78vw, 290px);
   }
 
   .weatherGauge:after {
@@ -699,7 +698,6 @@ h2 {
 
   .weatherCopy {
     width: 100%;
-    order: 1;
   }
 
   .space-weather.quiet {

@@ -489,7 +489,7 @@ async function runQuery(sql) {
 }
 
 function renderSpaceWeather(state, title, body, score = 0) {
-  els.spaceWeather.className = `space-weather ${state}`;
+  els.spaceWeather.className = `card weatherCard space-weather ${state}`;
   els.spaceWeatherTitle.textContent = title;
   els.spaceWeatherBody.textContent = body;
   const cleanScore = Math.round(Math.max(0, Math.min(100, Number(score) || 0)));
