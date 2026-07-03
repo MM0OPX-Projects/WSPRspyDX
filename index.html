@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#172033">
+  <title>WSPRSpyDX</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css?v=13">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>WSPRSpyDX</h1>
+      </div>
+      <button class="icon-button" id="refreshBtn" type="button" aria-label="Refresh data" title="Refresh data">&#8635;</button>
+    </header>
+
+    <section class="panel controls" aria-label="Path controls">
+      <div class="country-grid">
+        <label>
+          <span>Region A</span>
+          <div class="combo">
+            <input id="aCountry" list="aCountryOptions" autocomplete="off" value="Scotland" aria-label="Region A country or area">
+            <datalist id="aCountryOptions"></datalist>
+            <div class="suggestions" id="aSuggestions" role="listbox"></div>
+          </div>
+        </label>
+        <label>
+          <span>Region B</span>
+          <div class="combo">
+            <input id="bCountry" list="bCountryOptions" autocomplete="off" value="New Zealand" aria-label="Region B country or area">
+            <datalist id="bCountryOptions"></datalist>
+            <div class="suggestions" id="bSuggestions" role="listbox"></div>
+          </div>
+        </label>
+      </div>
+
+      <div class="control-grid">
+        <label>
+          <span>History</span>
+          <select id="period">
+            <option value="1">1 day</option>
+            <option value="2">2 days</option>
+            <option value="3">3 days</option>
+            <option value="4">4 days</option>
+            <option value="5">5 days</option>
+            <option value="10">10 days</option>
+            <option value="20">20 days</option>
+            <option value="30">30 days</option>
+            <option value="90" selected>90 days</option>
+          </select>
+        </label>
+        <label>
+          <span>Direction</span>
+          <select id="direction">
+            <option value="both" selected>Both ways</option>
+            <option value="ab">A heard in B</option>
+            <option value="ba">B heard in A</option>
+          </select>
+        </label>
+      </div>
+
+      <details id="customDetails">
+        <summary>Region boxes</summary>
+        <div class="box-editor">
+          <fieldset>
+            <legend>Region A</legend>
+            <input id="aName" aria-label="Region A name">
+            <div class="coord-grid">
+              <input id="aLatMin" inputmode="decimal" aria-label="A minimum latitude">
+              <input id="aLatMax" inputmode="decimal" aria-label="A maximum latitude">
+              <input id="aLonMin" inputmode="decimal" aria-label="A minimum longitude">
+              <input id="aLonMax" inputmode="decimal" aria-label="A maximum longitude">
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Region B</legend>
+            <input id="bName" aria-label="Region B name">
+            <div class="coord-grid">
+              <input id="bLatMin" inputmode="decimal" aria-label="B minimum latitude">
+              <input id="bLatMax" inputmode="decimal" aria-label="B maximum latitude">
+              <input id="bLonMin" inputmode="decimal" aria-label="B minimum longitude">
+              <input id="bLonMax" inputmode="decimal" aria-label="B maximum longitude">
+            </div>
+          </fieldset>
+        </div>
+      </details>
+
+      <button id="runBtn" class="primary" type="button">Run path check</button>
+    </section>
+
+    <section class="status" id="status" role="status">Ready.</section>
+
+    <section class="space-weather quiet" id="spaceWeather" aria-label="Space weather">
+      <div>
+        <span class="weather-label">Space weather</span>
+        <strong id="spaceWeatherTitle">Checking NOAA Kp...</strong>
+      </div>
+      <p id="spaceWeatherBody">Recent geomagnetic activity can make current HF conditions differ from the historical WSPR pattern.</p>
+    </section>
+
+    <section class="score-strip" id="scoreStrip" aria-label="Band summary"></section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Path Map</h2>
+        <span id="mapMeta"></span>
+      </div>
+      <div class="path-map" id="pathMap" aria-label="Selected radio path map"></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>UTC Windows</h2>
+        <span id="queryMeta"></span>
+      </div>
+      <div class="heatmap-wrap">
+        <table class="heatmap" id="heatmap" aria-label="Band by hour heatmap"></table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Best Slots</h2>
+        <span>ranked by spot count</span>
+      </div>
+      <ol class="slot-list" id="slotList"></ol>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Best By Band</h2>
+        <span>best 3h UTC window</span>
+      </div>
+      <ol class="slot-list" id="bandChanceList"></ol>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Latest Spots</h2>
+        <span id="latestMeta"></span>
+      </div>
+      <div class="latest" id="latest"></div>
+    </section>
+
+    <footer class="source-note">
+      Data sources: <a href="https://wspr.live/" target="_blank" rel="noopener">WSPR Live</a> and NOAA/SWPC.
+      100W estimates scale WSPR SNR by reported TX power.
+    </footer>
+  </main>
+  <script src="app.js?v=13"></script>
+</body>
+</html>

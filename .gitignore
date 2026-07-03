@@ -1,0 +1,6 @@
+.android-build/
+android-apk/build/
+*.idsig
+*.keystore
+*.tmp
+Thumbs.db
