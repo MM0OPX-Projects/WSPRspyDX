@@ -165,29 +165,47 @@ function boxCenter(box) {
   };
 }
 
-function endpointPoint(box, endpoint) {
-  const lat = Number(endpoint?.lat);
-  const lon = Number(endpoint?.lon);
-  if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
-  return boxCenter(box);
+function interpolateLatitudeY(lat) {
+  const anchors = [
+    { lat: 90, y: 0 },
+    { lat: 75, y: 95 },
+    { lat: 60, y: 245 },
+    { lat: 50, y: 345 },
+    { lat: 40, y: 430 },
+    { lat: 20, y: 545 },
+    { lat: 0, y: 640 },
+    { lat: -20, y: 765 },
+    { lat: -40, y: 890 },
+    { lat: -55, y: 960 },
+    { lat: -90, y: 1024 }
+  ];
+  const clamped = Math.max(-90, Math.min(90, Number(lat)));
+  for (let index = 0; index < anchors.length - 1; index += 1) {
+    const upper = anchors[index];
+    const lower = anchors[index + 1];
+    if (clamped <= upper.lat && clamped >= lower.lat) {
+      const progress = (upper.lat - clamped) / (upper.lat - lower.lat);
+      return upper.y + (lower.y - upper.y) * progress;
+    }
+  }
+  return anchors[anchors.length - 1].y;
 }
 
-function renderPathMap(a, b, endpoints = null) {
-  const aCenter = endpointPoint(a, endpoints?.a);
-  const bCenter = endpointPoint(b, endpoints?.b);
+function mapProject(point) {
   const viewWidth = 1536;
   const viewHeight = 1024;
-  const mapFrame = { x: 0, y: 0, width: 1536, height: 1024 };
-  const projectLat = (lat) => {
-    const clamped = Math.max(-90, Math.min(90, lat));
-    const radians = clamped * Math.PI / 180;
-    const robinsonish = Math.sign(clamped) * Math.pow(Math.abs(Math.sin(radians)), 0.78);
-    return mapFrame.y + (0.5 - robinsonish * 0.5) * mapFrame.height;
+  const x = 704 + Number(point.lon) * 4.22;
+  return {
+    x: Math.max(14, Math.min(viewWidth - 14, x)),
+    y: Math.max(14, Math.min(viewHeight - 14, interpolateLatitudeY(point.lat)))
   };
-  const mapProject = (point) => ({
-    x: mapFrame.x + ((point.lon + 180) / 360) * mapFrame.width,
-    y: projectLat(point.lat)
-  });
+}
+
+function renderPathMap(a, b) {
+  const aCenter = boxCenter(a);
+  const bCenter = boxCenter(b);
+  const viewWidth = 1536;
+  const viewHeight = 1024;
   const aPoint = mapProject(aCenter);
   const bPoint = mapProject(bCenter);
   const dx = bPoint.x - aPoint.x;
@@ -197,8 +215,7 @@ function renderPathMap(a, b, endpoints = null) {
   const midY = (aPoint.y + bPoint.y) / 2 - curve;
   const labelX = (point) => Math.min(viewWidth - 240, Math.max(24, point.x + 18));
   const labelY = (point) => Math.min(viewHeight - 30, Math.max(36, point.y - 16));
-  const basis = endpoints?.source ? ` (${endpoints.source})` : "";
-  els.mapMeta.textContent = `${a.name} to ${b.name}${basis}`;
+  els.mapMeta.textContent = `${a.name} to ${b.name}`;
   els.pathMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="${a.name} to ${b.name} path">
       <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
@@ -488,14 +505,6 @@ function pathWhere(a, b) {
   return `(${ab} OR ${ba})`;
 }
 
-function endpointSqlParts(a, b) {
-  const ab = `(${regionWhere("tx", a)} AND ${regionWhere("rx", b)})`;
-  const ba = `(${regionWhere("tx", b)} AND ${regionWhere("rx", a)})`;
-  if (els.direction.value === "ab") return { ab, ba: "0" };
-  if (els.direction.value === "ba") return { ab: "0", ba };
-  return { ab, ba };
-}
-
 async function runQuery(sql) {
   const url = `${endpoint}?query=${encodeURIComponent(`${sql} FORMAT JSON`)}`;
   const response = await fetch(url);
@@ -587,42 +596,6 @@ function renderHeatmap(rows) {
     return `<tr><th>${String(hour).padStart(2, "0")}</th>${cells}</tr>`;
   }).join("");
   els.heatmap.innerHTML = body ? header + body : `<tr><td>No WSPR spots found for this path.</td></tr>`;
-}
-
-function weightedCoord(parts) {
-  let total = 0;
-  let latSum = 0;
-  let lonSum = 0;
-  parts.forEach((part) => {
-    const count = Number(part.count);
-    const lat = Number(part.lat);
-    const lon = Number(part.lon);
-    if (count > 0 && Number.isFinite(lat) && Number.isFinite(lon)) {
-      total += count;
-      latSum += lat * count;
-      lonSum += lon * count;
-    }
-  });
-  if (!total) return null;
-  return { lat: latSum / total, lon: lonSum / total, count: total };
-}
-
-function endpointCentroids(row) {
-  if (!row) return null;
-  const aPoint = weightedCoord([
-    { count: row.ab_count, lat: row.ab_a_lat, lon: row.ab_a_lon },
-    { count: row.ba_count, lat: row.ba_a_lat, lon: row.ba_a_lon }
-  ]);
-  const bPoint = weightedCoord([
-    { count: row.ab_count, lat: row.ab_b_lat, lon: row.ab_b_lon },
-    { count: row.ba_count, lat: row.ba_b_lat, lon: row.ba_b_lon }
-  ]);
-  if (!aPoint || !bPoint) return null;
-  return {
-    a: aPoint,
-    b: bPoint,
-    source: `${Math.round((aPoint.count + bPoint.count) / 2).toLocaleString()} spot centroid`
-  };
 }
 
 function renderSlots(rows) {
@@ -717,7 +690,6 @@ async function run() {
     const b = readBox("b");
     const days = Math.min(90, Math.max(1, Number(els.period.value)));
     const where = pathWhere(a, b);
-    const endpointParts = endpointSqlParts(a, b);
     const since = `time >= now() - INTERVAL ${days} DAY`;
 
     setStatus(`Querying ${a.name} ↔ ${b.name} over ${days} days...`);
@@ -746,24 +718,9 @@ async function run() {
       ORDER BY time DESC
       LIMIT 30`;
 
-    const endpointSql = `
-      SELECT
-        countIf(${endpointParts.ab}) AS ab_count,
-        avgIf(tx_lat, ${endpointParts.ab}) AS ab_a_lat,
-        avgIf(tx_lon, ${endpointParts.ab}) AS ab_a_lon,
-        avgIf(rx_lat, ${endpointParts.ab}) AS ab_b_lat,
-        avgIf(rx_lon, ${endpointParts.ab}) AS ab_b_lon,
-        countIf(${endpointParts.ba}) AS ba_count,
-        avgIf(rx_lat, ${endpointParts.ba}) AS ba_a_lat,
-        avgIf(rx_lon, ${endpointParts.ba}) AS ba_a_lon,
-        avgIf(tx_lat, ${endpointParts.ba}) AS ba_b_lat,
-        avgIf(tx_lon, ${endpointParts.ba}) AS ba_b_lon
-      FROM wspr.rx
-      WHERE ${since} AND ${where}`;
-
-    const [summary, latest, endpoints] = await Promise.all([runQuery(summarySql), runQuery(latestSql), runQuery(endpointSql)]);
+    const [summary, latest] = await Promise.all([runQuery(summarySql), runQuery(latestSql)]);
     renderScores(summary);
-    renderPathMap(a, b, endpointCentroids(endpoints[0]));
+    renderPathMap(a, b);
     renderHeatmap(summary);
     renderSlots(summary);
     renderBandChances(summary);
