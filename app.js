@@ -87,6 +87,8 @@ const els = {
   runBtn: document.querySelector("#runBtn"),
   status: document.querySelector("#status"),
   spaceWeather: document.querySelector("#spaceWeather"),
+  spaceWeatherGauge: document.querySelector("#spaceWeatherGauge"),
+  spaceWeatherScore: document.querySelector("#spaceWeatherScore"),
   spaceWeatherTitle: document.querySelector("#spaceWeatherTitle"),
   spaceWeatherBody: document.querySelector("#spaceWeatherBody"),
   customDetails: document.querySelector("#customDetails"),
@@ -163,9 +165,16 @@ function boxCenter(box) {
   };
 }
 
-function renderPathMap(a, b) {
-  const aCenter = boxCenter(a);
-  const bCenter = boxCenter(b);
+function endpointPoint(box, endpoint) {
+  const lat = Number(endpoint?.lat);
+  const lon = Number(endpoint?.lon);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+  return boxCenter(box);
+}
+
+function renderPathMap(a, b, endpoints = null) {
+  const aCenter = endpointPoint(a, endpoints?.a);
+  const bCenter = endpointPoint(b, endpoints?.b);
   const viewWidth = 1792;
   const viewHeight = 1024;
   const mapFrame = { x: 56, y: 35, width: 1680, height: 856 };
@@ -182,7 +191,8 @@ function renderPathMap(a, b) {
   const midY = (aPoint.y + bPoint.y) / 2 - curve;
   const labelX = (point) => Math.min(viewWidth - 220, Math.max(24, point.x + 18));
   const labelY = (point) => Math.min(viewHeight - 30, Math.max(36, point.y - 16));
-  els.mapMeta.textContent = `${a.name} to ${b.name}`;
+  const basis = endpoints?.source ? ` (${endpoints.source})` : "";
+  els.mapMeta.textContent = `${a.name} to ${b.name}${basis}`;
   els.pathMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="${a.name} to ${b.name} path">
       <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
@@ -456,6 +466,14 @@ function pathWhere(a, b) {
   return `(${ab} OR ${ba})`;
 }
 
+function endpointSqlParts(a, b) {
+  const ab = `(${regionWhere("tx", a)} AND ${regionWhere("rx", b)})`;
+  const ba = `(${regionWhere("tx", b)} AND ${regionWhere("rx", a)})`;
+  if (els.direction.value === "ab") return { ab, ba: "0" };
+  if (els.direction.value === "ba") return { ab: "0", ba };
+  return { ab, ba };
+}
+
 async function runQuery(sql) {
   const url = `${endpoint}?query=${encodeURIComponent(`${sql} FORMAT JSON`)}`;
   const response = await fetch(url);
@@ -464,10 +482,13 @@ async function runQuery(sql) {
   return json.data || [];
 }
 
-function renderSpaceWeather(state, title, body) {
+function renderSpaceWeather(state, title, body, score = 0) {
   els.spaceWeather.className = `space-weather ${state}`;
   els.spaceWeatherTitle.textContent = title;
   els.spaceWeatherBody.textContent = body;
+  const cleanScore = Math.round(Math.max(0, Math.min(100, Number(score) || 0)));
+  els.spaceWeatherScore.textContent = cleanScore;
+  els.spaceWeatherGauge.style.setProperty("--gauge", cleanScore);
 }
 
 async function loadSpaceWeather() {
@@ -481,21 +502,22 @@ async function loadSpaceWeather() {
       .filter((row) => !Number.isNaN(row.kp) && now - row.time.getTime() <= 48 * 60 * 60 * 1000)
       .sort((a, b) => a.time - b.time);
     if (!recent.length) {
-      renderSpaceWeather("caution", "Kp data unavailable", "Could not find recent NOAA Kp values, so treat the WSPR history without a current geomagnetic check.");
+      renderSpaceWeather("caution", "Kp data unavailable", "Could not find recent NOAA Kp values, so treat the WSPR history without a current geomagnetic check.", 45);
       return;
     }
     const latest = recent[recent.length - 1];
     const max = recent.reduce((best, row) => row.kp > best.kp ? row : best, recent[0]);
     const maxText = `Latest Kp ${latest.kp.toFixed(1)}, max ${max.kp.toFixed(1)} in the last 48h.`;
+    const stability = Math.round(Math.max(0, Math.min(100, 100 - (max.kp / 9) * 100)));
     if (max.kp >= 5) {
-      renderSpaceWeather("storm", "Geomagnetic storm recently", `${maxText} HF paths may be depressed or unusually variable; compare short history against longer history before calling the path dead.`);
+      renderSpaceWeather("storm", "Geomagnetic storm recently", `${maxText} HF paths may be depressed or unusually variable; compare short history against longer history before calling the path dead.`, stability);
     } else if (max.kp >= 4) {
-      renderSpaceWeather("caution", "Geomagnetic activity elevated", `${maxText} Conditions may be unsettled, especially on higher latitude or polar paths.`);
+      renderSpaceWeather("caution", "Geomagnetic activity elevated", `${maxText} Conditions may be unsettled, especially on higher latitude or polar paths.`, stability);
     } else {
-      renderSpaceWeather("quiet", "Geomagnetic field quiet", `${maxText} Recent Kp does not suggest a storm-driven warning for this path.`);
+      renderSpaceWeather("quiet", "Geomagnetic field quiet", `${maxText} Recent Kp does not suggest a storm-driven warning for this path.`, stability);
     }
   } catch (error) {
-    renderSpaceWeather("caution", "Space weather check failed", `${error.message} WSPR results still work, but no current Kp warning is available.`);
+    renderSpaceWeather("caution", "Space weather check failed", `${error.message} WSPR results still work, but no current Kp warning is available.`, 45);
   }
 }
 
@@ -543,6 +565,42 @@ function renderHeatmap(rows) {
     return `<tr><th>${String(hour).padStart(2, "0")}</th>${cells}</tr>`;
   }).join("");
   els.heatmap.innerHTML = body ? header + body : `<tr><td>No WSPR spots found for this path.</td></tr>`;
+}
+
+function weightedCoord(parts) {
+  let total = 0;
+  let latSum = 0;
+  let lonSum = 0;
+  parts.forEach((part) => {
+    const count = Number(part.count);
+    const lat = Number(part.lat);
+    const lon = Number(part.lon);
+    if (count > 0 && Number.isFinite(lat) && Number.isFinite(lon)) {
+      total += count;
+      latSum += lat * count;
+      lonSum += lon * count;
+    }
+  });
+  if (!total) return null;
+  return { lat: latSum / total, lon: lonSum / total, count: total };
+}
+
+function endpointCentroids(row) {
+  if (!row) return null;
+  const aPoint = weightedCoord([
+    { count: row.ab_count, lat: row.ab_a_lat, lon: row.ab_a_lon },
+    { count: row.ba_count, lat: row.ba_a_lat, lon: row.ba_a_lon }
+  ]);
+  const bPoint = weightedCoord([
+    { count: row.ab_count, lat: row.ab_b_lat, lon: row.ab_b_lon },
+    { count: row.ba_count, lat: row.ba_b_lat, lon: row.ba_b_lon }
+  ]);
+  if (!aPoint || !bPoint) return null;
+  return {
+    a: aPoint,
+    b: bPoint,
+    source: `${Math.round((aPoint.count + bPoint.count) / 2).toLocaleString()} spot centroid`
+  };
 }
 
 function renderSlots(rows) {
@@ -616,6 +674,7 @@ async function run() {
     const b = readBox("b");
     const days = Math.min(90, Math.max(1, Number(els.period.value)));
     const where = pathWhere(a, b);
+    const endpointParts = endpointSqlParts(a, b);
     const since = `time >= now() - INTERVAL ${days} DAY`;
 
     setStatus(`Querying ${a.name} ↔ ${b.name} over ${days} days...`);
@@ -644,9 +703,24 @@ async function run() {
       ORDER BY time DESC
       LIMIT 30`;
 
-    const [summary, latest] = await Promise.all([runQuery(summarySql), runQuery(latestSql)]);
+    const endpointSql = `
+      SELECT
+        countIf(${endpointParts.ab}) AS ab_count,
+        avgIf(tx_lat, ${endpointParts.ab}) AS ab_a_lat,
+        avgIf(tx_lon, ${endpointParts.ab}) AS ab_a_lon,
+        avgIf(rx_lat, ${endpointParts.ab}) AS ab_b_lat,
+        avgIf(rx_lon, ${endpointParts.ab}) AS ab_b_lon,
+        countIf(${endpointParts.ba}) AS ba_count,
+        avgIf(rx_lat, ${endpointParts.ba}) AS ba_a_lat,
+        avgIf(rx_lon, ${endpointParts.ba}) AS ba_a_lon,
+        avgIf(tx_lat, ${endpointParts.ba}) AS ba_b_lat,
+        avgIf(tx_lon, ${endpointParts.ba}) AS ba_b_lon
+      FROM wspr.rx
+      WHERE ${since} AND ${where}`;
+
+    const [summary, latest, endpoints] = await Promise.all([runQuery(summarySql), runQuery(latestSql), runQuery(endpointSql)]);
     renderScores(summary);
-    renderPathMap(a, b);
+    renderPathMap(a, b, endpointCentroids(endpoints[0]));
     renderHeatmap(summary);
     renderSlots(summary);
     renderBandChances(summary);
