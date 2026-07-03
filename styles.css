@@ -183,6 +183,8 @@ button:disabled {
   left: 0;
   right: 0;
   overflow: hidden;
+  max-height: 230px;
+  overflow-y: auto;
   border: 1px solid rgba(255,255,255,.13);
   border-radius: 14px;
   background: #12223b;
@@ -200,6 +202,8 @@ button:disabled {
   background: transparent;
   box-shadow: none;
   text-align: left;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .suggestions button + button {
@@ -322,6 +326,7 @@ h2 {
   align-content: start;
   gap: 8px;
   border-left-width: 5px;
+  padding-left: 18px;
 }
 
 .space-weather.quiet {
@@ -392,7 +397,7 @@ h2 {
   border: 1px solid rgba(255,255,255,.1);
   border-radius: 18px;
   background: #0d1d30;
-  aspect-ratio: 2 / 1;
+  aspect-ratio: 7 / 4;
 }
 
 .path-map svg {
@@ -410,21 +415,21 @@ h2 {
 .map-route {
   fill: none;
   stroke: var(--orange);
-  stroke-width: 5;
+  stroke-width: 8;
   stroke-linecap: round;
 }
 
 .map-route-shadow {
   fill: none;
   stroke: #ffffff;
-  stroke-width: 9;
+  stroke-width: 14;
   stroke-linecap: round;
   opacity: .85;
 }
 
 .map-pin {
   stroke: #ffffff;
-  stroke-width: 4;
+  stroke-width: 6;
 }
 
 .map-pin.a {
@@ -445,13 +450,13 @@ h2 {
 }
 
 .heatmap-wrap {
-  overflow-x: auto;
+  overflow-x: visible;
   padding-bottom: 4px;
 }
 
 .heatmap {
   width: 100%;
-  min-width: 680px;
+  min-width: 0;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: .72rem;
@@ -459,7 +464,7 @@ h2 {
 
 .heatmap th,
 .heatmap td {
-  height: 30px;
+  height: 28px;
   border: 1px solid rgba(255,255,255,.08);
   text-align: center;
 }
@@ -467,6 +472,7 @@ h2 {
 .heatmap th {
   color: var(--muted);
   font-weight: 800;
+  background: rgba(13,23,41,.72);
 }
 
 .heatmap td {
@@ -571,6 +577,10 @@ h2 {
   .path-map {
     min-height: 240px;
   }
+
+  .weatherCard {
+    order: -1;
+  }
 }
 
 @media (max-width: 520px) {
@@ -604,12 +614,53 @@ h2 {
   }
 
   .path-map {
-    min-height: 185px;
+    min-height: 205px;
     border-radius: 14px;
   }
 
+  .space-weather {
+    border-left-width: 1px;
+    border-top-width: 5px;
+    padding: 14px;
+    text-align: left;
+  }
+
+  .space-weather.quiet {
+    border-top-color: var(--good);
+  }
+
+  .space-weather.caution {
+    border-top-color: var(--warn);
+  }
+
+  .space-weather.storm {
+    border-top-color: var(--bad);
+  }
+
+  .heatmap {
+    font-size: .66rem;
+  }
+
+  .heatmap th,
+  .heatmap td {
+    height: 25px;
+    padding: 0 2px;
+  }
+
+  .heatmap th:first-child,
+  .heatmap td:first-child {
+    width: 34px;
+  }
+
+  .suggestions {
+    position: static;
+    margin-top: 7px;
+    border-radius: 12px;
+    box-shadow: none;
+  }
+
   .map-label {
-    font-size: 18px;
+    font-size: 28px;
   }
 
   .slot-main,

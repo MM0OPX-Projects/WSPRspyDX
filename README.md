@@ -1,11 +1,11 @@
-# WSPRSpyDX
+﻿# WSPRSpyDX
 
 WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagation between two countries or regions. It is aimed at quick phone use: choose Region A and Region B, pick a history window, then use the spot counts, band summaries, UTC windows, and signal estimates to judge whether a path is worth trying.
 
 The project is available in two formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
-- **Android APK**: `releases/WSPRSpyDX-v0.3-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.4-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
 
 ## Features
 
@@ -76,7 +76,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.3-debug.apk
+releases/WSPRSpyDX-v0.4-debug.apk
 ```
 
 To install it on Android:
@@ -103,16 +103,16 @@ The current test APK was built locally from this wrapper and the dashboard asset
 
 ```text
 .
-├── index.html
-├── app.js
-├── styles.css
-├── manifest.webmanifest
-├── sw.js
-├── icon.svg
-├── world-map.png
-├── android-apk/
-└── releases/
-    └── WSPRSpyDX-v0.3-debug.apk
+â”œâ”€â”€ index.html
+â”œâ”€â”€ app.js
+â”œâ”€â”€ styles.css
+â”œâ”€â”€ manifest.webmanifest
+â”œâ”€â”€ sw.js
+â”œâ”€â”€ icon.svg
+â”œâ”€â”€ world-map.png
+â”œâ”€â”€ android-apk/
+â””â”€â”€ releases/
+    â””â”€â”€ WSPRSpyDX-v0.4-debug.apk
 ```
 
 ## Notes
@@ -120,3 +120,4 @@ The current test APK was built locally from this wrapper and the dashboard asset
 - The HTML shell can load offline after caching, but propagation data requires internet access.
 - The 100 W and mode indicators are practical estimates, not guarantees of a QSO.
 - WSPR uses very low power and narrow-band reporting, so use the dashboard as a path reckoner rather than a definitive prediction engine.
+

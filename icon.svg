@@ -1,7 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#172033"/>
-  <path d="M96 320c62-132 258-132 320 0" fill="none" stroke="#66d6a3" stroke-width="34" stroke-linecap="round"/>
-  <path d="M136 260c48-88 192-88 240 0" fill="none" stroke="#f2b35d" stroke-width="30" stroke-linecap="round"/>
-  <circle cx="256" cy="332" r="34" fill="#eef3fb"/>
-  <path d="M256 332 196 140M256 332l60-192" stroke="#eef3fb" stroke-width="18" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WSPRSpyDX three element Yagi icon">
+  <defs>
+    <linearGradient id="bg" x1="74" y1="74" x2="438" y2="438" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172c52"/>
+      <stop offset="0.54" stop-color="#111b2f"/>
+      <stop offset="1" stop-color="#07111f"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="114" y1="140" x2="398" y2="372" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#26d07c"/>
+      <stop offset="1" stop-color="#49a7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <path d="M118 344c78-128 198-128 276 0" fill="none" stroke="#f6c945" stroke-width="18" stroke-linecap="round" opacity=".92"/>
+  <path d="M134 344c70-96 174-96 244 0" fill="none" stroke="#f05a28" stroke-width="10" stroke-linecap="round" opacity=".92"/>
+  <g transform="translate(92 118) rotate(-18 164 146)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M54 176h220" stroke="url(#beam)" stroke-width="24"/>
+    <path d="M122 72v208" stroke="#eef5ff" stroke-width="22"/>
+    <path d="M184 98v156" stroke="#eef5ff" stroke-width="22"/>
+    <path d="M244 122v108" stroke="#eef5ff" stroke-width="22"/>
+    <path d="M54 176l-28 30" stroke="#49a7ff" stroke-width="18"/>
+    <circle cx="54" cy="176" r="18" fill="#26d07c" stroke="#eef5ff" stroke-width="8"/>
+  </g>
+  <text x="256" y="432" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="800" fill="#eef5ff">DX</text>
 </svg>

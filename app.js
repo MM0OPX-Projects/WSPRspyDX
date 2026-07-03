@@ -166,9 +166,9 @@ function boxCenter(box) {
 function renderPathMap(a, b) {
   const aCenter = boxCenter(a);
   const bCenter = boxCenter(b);
-  const viewWidth = 1000;
-  const viewHeight = 500;
-  const mapFrame = { x: 31, y: 19, width: 942, height: 466 };
+  const viewWidth = 1792;
+  const viewHeight = 1024;
+  const mapFrame = { x: 56, y: 35, width: 1680, height: 856 };
   const mapProject = (point) => ({
     x: mapFrame.x + ((point.lon + 180) / 360) * mapFrame.width,
     y: mapFrame.y + ((90 - Math.max(-90, Math.min(90, point.lat))) / 180) * mapFrame.height
@@ -177,19 +177,21 @@ function renderPathMap(a, b) {
   const bPoint = mapProject(bCenter);
   const dx = bPoint.x - aPoint.x;
   const dy = bPoint.y - aPoint.y;
-  const curve = Math.min(110, Math.max(40, Math.hypot(dx, dy) * 0.18));
+  const curve = Math.min(190, Math.max(70, Math.hypot(dx, dy) * 0.16));
   const midX = (aPoint.x + bPoint.x) / 2;
   const midY = (aPoint.y + bPoint.y) / 2 - curve;
+  const labelX = (point) => Math.min(viewWidth - 220, Math.max(24, point.x + 18));
+  const labelY = (point) => Math.min(viewHeight - 30, Math.max(36, point.y - 16));
   els.mapMeta.textContent = `${a.name} to ${b.name}`;
   els.pathMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="${a.name} to ${b.name} path">
       <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
       <path class="map-route-shadow" d="M ${aPoint.x.toFixed(1)} ${aPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${bPoint.x.toFixed(1)} ${bPoint.y.toFixed(1)}"></path>
       <path class="map-route" d="M ${aPoint.x.toFixed(1)} ${aPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${bPoint.x.toFixed(1)} ${bPoint.y.toFixed(1)}"></path>
-      <circle class="map-pin a" cx="${aPoint.x.toFixed(1)}" cy="${aPoint.y.toFixed(1)}" r="8"></circle>
-      <circle class="map-pin b" cx="${bPoint.x.toFixed(1)}" cy="${bPoint.y.toFixed(1)}" r="8"></circle>
-      <text class="map-label" x="${Math.min(900, Math.max(18, aPoint.x + 12)).toFixed(1)}" y="${Math.max(24, aPoint.y - 10).toFixed(1)}">${a.name}</text>
-      <text class="map-label" x="${Math.min(900, Math.max(18, bPoint.x + 12)).toFixed(1)}" y="${Math.max(24, bPoint.y - 10).toFixed(1)}">${b.name}</text>
+      <circle class="map-pin a" cx="${aPoint.x.toFixed(1)}" cy="${aPoint.y.toFixed(1)}" r="12"></circle>
+      <circle class="map-pin b" cx="${bPoint.x.toFixed(1)}" cy="${bPoint.y.toFixed(1)}" r="12"></circle>
+      <text class="map-label" x="${labelX(aPoint).toFixed(1)}" y="${labelY(aPoint).toFixed(1)}">${a.name}</text>
+      <text class="map-label" x="${labelX(bPoint).toFixed(1)}" y="${labelY(bPoint).toFixed(1)}">${b.name}</text>
     </svg>
   `;
 }
@@ -530,15 +532,15 @@ function renderHeatmap(rows) {
   const max = Math.max(1, ...rows.map((row) => Number(row.spots)));
   const lookup = new Map(rows.map((row) => [`${row.band}-${row.hour}`, row]));
   const activeBands = bands.filter((band) => rows.some((row) => Number(row.band) === band));
-  const header = `<tr><th>Band</th>${Array.from({ length: 24 }, (_, h) => `<th>${h}</th>`).join("")}</tr>`;
-  const body = activeBands.map((band) => {
-    const cells = Array.from({ length: 24 }, (_, hour) => {
+  const header = `<tr><th>UTC</th>${activeBands.map((band) => `<th>${bandLabel(band)}</th>`).join("")}</tr>`;
+  const body = Array.from({ length: 24 }, (_, hour) => {
+    const cells = activeBands.map((band) => {
       const row = lookup.get(`${band}-${hour}`);
       const count = row ? Number(row.spots) : 0;
       const title = row ? `${bandLabel(band)} ${hour}:00 UTC: ${count} spots, avg SNR ${row.avg_snr} dB` : "";
       return `<td title="${title}" style="background:${heatColor(count, max)}">${count || ""}</td>`;
     }).join("");
-    return `<tr><th>${bandLabel(band)}</th>${cells}</tr>`;
+    return `<tr><th>${String(hour).padStart(2, "0")}</th>${cells}</tr>`;
   }).join("");
   els.heatmap.innerHTML = body ? header + body : `<tr><td>No WSPR spots found for this path.</td></tr>`;
 }
