@@ -103,16 +103,16 @@ The current test APK was built locally from this wrapper and the dashboard asset
 
 ```text
 .
-â”œâ”€â”€ index.html
-â”œâ”€â”€ app.js
-â”œâ”€â”€ styles.css
-â”œâ”€â”€ manifest.webmanifest
-â”œâ”€â”€ sw.js
-â”œâ”€â”€ icon.svg
-â”œâ”€â”€ world-map.png
-â”œâ”€â”€ android-apk/
-â””â”€â”€ releases/
-    â””â”€â”€ WSPRSpyDX-v0.4-debug.apk
+|-- index.html
+|-- app.js
+|-- styles.css
+|-- manifest.webmanifest
+|-- sw.js
+|-- icon.svg
+|-- world-map.png
+|-- android-apk/
+`-- releases/
+    `-- WSPRSpyDX-v0.4-debug.apk
 ```
 
 ## Notes
