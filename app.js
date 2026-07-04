@@ -65,24 +65,29 @@ const geocodeCache = new Map();
 const countryTimers = new Map();
 
 const bands = [1, 3, 5, 7, 10, 14, 18, 21, 24, 28, 50];
+const bandSqlList = bands.join(",");
 const bandLabels = new Map([
   [1, "160m"], [3, "80m"], [5, "60m"], [7, "40m"], [10, "30m"], [14, "20m"],
   [18, "17m"], [21, "15m"], [24, "12m"], [28, "10m"], [50, "6m"]
 ]);
 
 const els = {
+  aMode: document.querySelector("#aMode"),
   aCountry: document.querySelector("#aCountry"),
   aInputLabel: document.querySelector("#aInputLabel"),
   aCountryOptions: document.querySelector("#aCountryOptions"),
   aSuggestions: document.querySelector("#aSuggestions"),
+  bMode: document.querySelector("#bMode"),
   bCountry: document.querySelector("#bCountry"),
   bInputLabel: document.querySelector("#bInputLabel"),
   bCountryOptions: document.querySelector("#bCountryOptions"),
   bSuggestions: document.querySelector("#bSuggestions"),
-  pathMode: document.querySelector("#pathMode"),
   modeNote: document.querySelector("#modeNote"),
   period: document.querySelector("#period"),
   direction: document.querySelector("#direction"),
+  liveWindow: document.querySelector("#liveWindow"),
+  liveDirection: document.querySelector("#liveDirection"),
+  liveRefreshBtn: document.querySelector("#liveRefreshBtn"),
   refreshBtn: document.querySelector("#refreshBtn"),
   runBtn: document.querySelector("#runBtn"),
   status: document.querySelector("#status"),
@@ -96,6 +101,9 @@ const els = {
   heatmap: document.querySelector("#heatmap"),
   pathMap: document.querySelector("#pathMap"),
   mapMeta: document.querySelector("#mapMeta"),
+  liveMap: document.querySelector("#liveMap"),
+  liveMapMeta: document.querySelector("#liveMapMeta"),
+  liveSummary: document.querySelector("#liveSummary"),
   slotList: document.querySelector("#slotList"),
   bandChanceList: document.querySelector("#bandChanceList"),
   latest: document.querySelector("#latest"),
@@ -225,6 +233,49 @@ function renderPathMap(a, b) {
       <circle class="map-pin b" cx="${bPoint.x.toFixed(1)}" cy="${bPoint.y.toFixed(1)}" r="12"></circle>
       <text class="map-label" x="${labelX(aPoint).toFixed(1)}" y="${labelY(aPoint).toFixed(1)}">${a.name}</text>
       <text class="map-label" x="${labelX(bPoint).toFixed(1)}" y="${labelY(bPoint).toFixed(1)}">${b.name}</text>
+    </svg>
+  `;
+}
+
+function renderLiveMap(focus, rows, minutes, flow) {
+  const viewWidth = 1536;
+  const viewHeight = 1024;
+  const focusPoint = mapProject(boxCenter(focus));
+  const maxSnr = Math.max(-30, ...rows.map((row) => Number(row.snr)));
+  const minSnr = Math.min(10, ...rows.map((row) => Number(row.snr)));
+  const strength = (snr) => {
+    const range = Math.max(1, maxSnr - minSnr);
+    return Math.max(0.18, Math.min(1, (Number(snr) - minSnr) / range));
+  };
+  const routes = rows.map((row, index) => {
+    const sentFromFocus = row.flow === "sent";
+    const remote = mapProject({ lat: Number(row.remote_lat), lon: Number(row.remote_lon) });
+    const dx = remote.x - focusPoint.x;
+    const dy = remote.y - focusPoint.y;
+    const curve = Math.min(120, Math.max(45, Math.hypot(dx, dy) * 0.12));
+    const midX = (focusPoint.x + remote.x) / 2;
+    const midY = (focusPoint.y + remote.y) / 2 - curve;
+    const alpha = strength(row.snr);
+    const color = sentFromFocus ? "var(--blue)" : "var(--good)";
+    return `
+      <path class="live-route" style="--route-color:${color};--route-alpha:${alpha.toFixed(2)}" d="M ${focusPoint.x.toFixed(1)} ${focusPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${remote.x.toFixed(1)} ${remote.y.toFixed(1)}"></path>
+      <circle class="live-dot" cx="${remote.x.toFixed(1)}" cy="${remote.y.toFixed(1)}" r="${Math.max(5, Math.min(13, 5 + alpha * 9)).toFixed(1)}">
+        <title>${sentFromFocus ? row.rx_sign : row.tx_sign} ${bandLabel(row.band)} ${row.snr} dB</title>
+      </circle>
+      ${index < 10 ? `<text class="live-label" x="${Math.min(viewWidth - 230, Math.max(24, remote.x + 13)).toFixed(1)}" y="${Math.min(viewHeight - 28, Math.max(32, remote.y - 9)).toFixed(1)}">${bandLabel(row.band)}</text>` : ""}
+    `;
+  }).join("");
+  const flowText = flow === "sent" ? "sent from" : flow === "heard" ? "heard in" : "sent/heard by";
+  els.liveMapMeta.textContent = `${rows.length.toLocaleString()} spots ${flowText} ${focus.name}, last ${minutes} min`;
+  els.liveSummary.textContent = rows.length
+    ? `Latest spot ${rows[0].tx_sign} to ${rows[0].rx_sign} on ${bandLabel(rows[0].band)}, ${rows[0].snr} dB.`
+    : `No live WSPR spots found for ${focus.name} in the last ${minutes} minutes.`;
+  els.liveMap.innerHTML = `
+    <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="Live WSPR openings from ${focus.name}">
+      <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
+      ${routes}
+      <circle class="map-pin a live-focus" cx="${focusPoint.x.toFixed(1)}" cy="${focusPoint.y.toFixed(1)}" r="14"></circle>
+      <text class="map-label" x="${Math.min(viewWidth - 240, Math.max(24, focusPoint.x + 18)).toFixed(1)}" y="${Math.min(viewHeight - 30, Math.max(36, focusPoint.y - 16)).toFixed(1)}">${focus.name}</text>
     </svg>
   `;
 }
@@ -457,7 +508,7 @@ async function resolveCountry(prefix, shouldReport = true) {
 }
 
 function scheduleCountryLookup(prefix) {
-  if (els.pathMode.value !== "country") return;
+  if (els[`${prefix}Mode`].value !== "country") return;
   clearTimeout(countryTimers.get(prefix));
   countryTimers.set(prefix, setTimeout(() => resolveCountry(prefix), 450));
 }
@@ -683,6 +734,56 @@ function renderLatest(rows) {
   `).join("") : `<p class="spot-sub">No recent spots for this path.</p>`;
 }
 
+async function runLiveMap() {
+  try {
+    await resolvePathInput("a", false);
+    const focus = readBox("a");
+    const minutes = Math.min(60, Math.max(15, Number(els.liveWindow.value)));
+    const flow = els.liveDirection.value;
+    const focusTx = regionWhere("tx", focus);
+    const focusRx = regionWhere("rx", focus);
+    const focusBoth = `(${focusTx} AND ${focusRx})`;
+    const flowWhere = flow === "sent"
+      ? `(${focusTx} AND NOT ${focusRx})`
+      : flow === "heard"
+        ? `(${focusRx} AND NOT ${focusTx})`
+        : `((${focusTx} OR ${focusRx}) AND NOT ${focusBoth})`;
+    const sql = `
+      SELECT
+        time,
+        band,
+        tx_sign,
+        rx_sign,
+        snr,
+        power,
+        if(${focusTx}, 'sent', 'heard') AS flow,
+        if(${focusTx}, rx_lat, tx_lat) AS remote_lat,
+        if(${focusTx}, rx_lon, tx_lon) AS remote_lon
+      FROM wspr.rx
+      WHERE time >= now() - INTERVAL ${minutes} MINUTE
+        AND band IN (${bandSqlList})
+        AND ${flowWhere}
+        AND tx_lat BETWEEN -90 AND 90
+        AND rx_lat BETWEEN -90 AND 90
+        AND tx_lon BETWEEN -180 AND 180
+        AND rx_lon BETWEEN -180 AND 180
+      ORDER BY time DESC
+      LIMIT 120`;
+    els.liveRefreshBtn.disabled = true;
+    els.liveSummary.textContent = `Checking live WSPR spots for ${focus.name}...`;
+    const rows = await runQuery(sql);
+    renderLiveMap(focus, rows, minutes, flow);
+  } catch (error) {
+    els.liveMapMeta.textContent = "Live WSPR map";
+    els.liveSummary.textContent = error.message;
+    try {
+      renderLiveMap(readBox("a"), [], Number(els.liveWindow.value) || 15, els.liveDirection.value);
+    } catch (mapError) {}
+  } finally {
+    els.liveRefreshBtn.disabled = false;
+  }
+}
+
 async function run() {
   try {
     await resolveCurrentInputs(false);
@@ -707,14 +808,14 @@ async function run() {
         max(snr) AS best_snr,
         argMax(power, snr) AS best_power
       FROM wspr.rx
-      WHERE ${since} AND ${where}
+      WHERE ${since} AND band IN (${bandSqlList}) AND ${where}
       GROUP BY band, hour
       ORDER BY band, hour`;
 
     const latestSql = `
       SELECT time, band, tx_sign, tx_loc, rx_sign, rx_loc, distance, snr, power
       FROM wspr.rx
-      WHERE ${since} AND ${where}
+      WHERE ${since} AND band IN (${bandSqlList}) AND ${where}
       ORDER BY time DESC
       LIMIT 30`;
 
@@ -725,6 +826,7 @@ async function run() {
     renderSlots(summary);
     renderBandChances(summary);
     renderLatest(latest);
+    runLiveMap();
     els.queryMeta.textContent = `${a.name} ↔ ${b.name}, ${days} days`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} spots across ${summary.length} band/hour slots.`);
   } catch (error) {
@@ -735,8 +837,42 @@ async function run() {
   }
 }
 
+function modeDefault(prefix, mode) {
+  const defaults = {
+    country: prefix === "a" ? "Scotland" : "New Zealand",
+    cq: prefix === "a" ? "14" : "32",
+    itu: prefix === "a" ? "27" : "59",
+    locator: prefix === "a" ? "IO75" : "RF72"
+  };
+  return defaults[mode] || defaults.country;
+}
+
+function modePlaceholder(prefix, mode) {
+  const placeholders = {
+    country: prefix === "a" ? "Scotland" : "New Zealand",
+    cq: prefix === "a" ? "14" : "32",
+    itu: prefix === "a" ? "27" : "59",
+    locator: prefix === "a" ? "IO75" : "RF72"
+  };
+  return placeholders[mode] || placeholders.country;
+}
+
+function modeInputLabel(prefix, mode) {
+  const side = prefix.toUpperCase();
+  if (mode === "cq") return `CQ zone ${side}`;
+  if (mode === "itu") return `ITU zone ${side}`;
+  if (mode === "locator") return `Locator ${side}`;
+  return `Region ${side}`;
+}
+
+function modeHelpText() {
+  const aText = els.aMode.options[els.aMode.selectedIndex].text;
+  const bText = els.bMode.options[els.bMode.selectedIndex].text;
+  els.modeNote.textContent = `Path input: A uses ${aText}; B uses ${bText}. Countries autocomplete; zones and locators can be comma separated.`;
+}
+
 function resolveStructuredInput(prefix, shouldReport = true) {
-  const mode = els.pathMode.value;
+  const mode = els[`${prefix}Mode`].value;
   const value = els[`${prefix}Country`].value.trim();
   if (!value) throw new Error(`Enter a ${mode === "locator" ? "Maidenhead locator" : `${mode.toUpperCase()} zone`} for Region ${prefix.toUpperCase()}.`);
   const box = mode === "locator" ? parseLocators(value) : parseZones(value, mode);
@@ -747,7 +883,7 @@ function resolveStructuredInput(prefix, shouldReport = true) {
 }
 
 async function resolvePathInput(prefix, shouldReport = true) {
-  if (els.pathMode.value === "country") return resolveCountry(prefix, shouldReport);
+  if (els[`${prefix}Mode`].value === "country") return resolveCountry(prefix, shouldReport);
   return resolveStructuredInput(prefix, shouldReport);
 }
 
@@ -756,67 +892,31 @@ async function resolveCurrentInputs(shouldReport = true) {
   await resolvePathInput("b", shouldReport);
 }
 
-function updateModeUi() {
-  const mode = els.pathMode.value;
-  els.aSuggestions.classList.remove("open");
-  els.bSuggestions.classList.remove("open");
-  els.aCountryOptions.innerHTML = "";
-  els.bCountryOptions.innerHTML = "";
-
-  if (mode === "country") {
-    els.aInputLabel.textContent = "Region A";
-    els.bInputLabel.textContent = "Region B";
-    els.aCountry.placeholder = "Scotland";
-    els.bCountry.placeholder = "New Zealand";
-    els.modeNote.textContent = "Type countries or regions such as Scotland, New Zealand, USA East Coast, or Japan.";
-    if (!els.aCountry.value.trim()) els.aCountry.value = "Scotland";
-    if (!els.bCountry.value.trim()) els.bCountry.value = "New Zealand";
-    resolveCurrentInputs(false);
-    return;
-  }
-
-  if (mode === "cq") {
-    els.aInputLabel.textContent = "CQ zone A";
-    els.bInputLabel.textContent = "CQ zone B";
-    els.aCountry.placeholder = "14";
-    els.bCountry.placeholder = "1,2";
-    els.modeNote.textContent = "Enter one or more CQ zones. Multiple zones can be comma separated, for example 14 to 1,2.";
-    els.aCountry.value = "14";
-    els.bCountry.value = "1,2";
-  } else if (mode === "itu") {
-    els.aInputLabel.textContent = "ITU zone A";
-    els.bInputLabel.textContent = "ITU zone B";
-    els.aCountry.placeholder = "27";
-    els.bCountry.placeholder = "1,2";
-    els.modeNote.textContent = "Enter one or more ITU zones. WSPR Live has no zone column, so zones are converted to practical lat/lon areas.";
-    els.aCountry.value = "27";
-    els.bCountry.value = "1,2";
-  } else {
-    els.aInputLabel.textContent = "Locator A";
-    els.bInputLabel.textContent = "Locator B";
-    els.aCountry.placeholder = "IO75";
-    els.bCountry.placeholder = "RF72";
-    els.modeNote.textContent = "Enter Maidenhead locators. Use 4 or 6 characters for practical area searches; multiple locators can be comma separated.";
-    els.aCountry.value = "IO75";
-    els.bCountry.value = "RF72";
-  }
-
+function updateModeUi(prefix, resetValue = true) {
+  const mode = els[`${prefix}Mode`].value;
+  els[`${prefix}InputLabel`].textContent = modeInputLabel(prefix, mode);
+  els[`${prefix}Country`].placeholder = modePlaceholder(prefix, mode);
+  els[`${prefix}CountryOptions`].innerHTML = "";
+  els[`${prefix}Suggestions`].classList.remove("open");
+  if (resetValue) els[`${prefix}Country`].value = modeDefault(prefix, mode);
+  modeHelpText();
   try {
-    resolveCurrentInputs(false);
+    resolvePathInput(prefix, false);
   } catch (error) {
     setStatus(error.message, true);
   }
 }
 
-els.pathMode.addEventListener("change", updateModeUi);
+els.aMode.addEventListener("change", () => updateModeUi("a"));
+els.bMode.addEventListener("change", () => updateModeUi("b"));
 els.aCountry.addEventListener("input", () => {
-  if (els.pathMode.value === "country") scheduleCountryLookup("a");
+  if (els.aMode.value === "country") scheduleCountryLookup("a");
   else {
     try { resolveStructuredInput("a", false); } catch (error) {}
   }
 });
 els.bCountry.addEventListener("input", () => {
-  if (els.pathMode.value === "country") scheduleCountryLookup("b");
+  if (els.bMode.value === "country") scheduleCountryLookup("b");
   else {
     try { resolveStructuredInput("b", false); } catch (error) {}
   }
@@ -838,6 +938,9 @@ document.addEventListener("click", (event) => {
   }
 });
 els.runBtn.addEventListener("click", run);
+els.liveRefreshBtn.addEventListener("click", runLiveMap);
+els.liveWindow.addEventListener("change", runLiveMap);
+els.liveDirection.addEventListener("change", runLiveMap);
 els.refreshBtn.addEventListener("click", () => {
   loadSpaceWeather();
   run();
@@ -849,6 +952,7 @@ if ("serviceWorker" in navigator) {
 
 fillBox("a", knownRegions.scotland);
 fillBox("b", knownRegions["new zealand"]);
-updateModeUi();
+updateModeUi("a", false);
+updateModeUi("b", false);
 loadSpaceWeather();
 run();

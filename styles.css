@@ -283,6 +283,10 @@ fieldset {
   grid-column: span 12;
 }
 
+.liveMapCard {
+  grid-column: span 12;
+}
+
 .weatherCard {
   grid-column: span 12;
 }
@@ -319,6 +323,33 @@ h2 {
   font-size: .78rem;
   font-weight: 800;
   text-align: right;
+}
+
+.live-head {
+  align-items: start;
+}
+
+.live-controls {
+  display: grid;
+  grid-template-columns: auto minmax(92px, 130px) auto minmax(126px, 170px) minmax(120px, 150px);
+  gap: 8px;
+  align-items: center;
+}
+
+.live-controls label {
+  margin: 0;
+  color: #bad4ef;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.live-controls select,
+.live-controls button {
+  min-height: 38px;
+  border-radius: 10px;
+  font-size: .86rem;
 }
 
 .space-weather {
@@ -509,6 +540,45 @@ h2 {
   stroke-width: 6px;
 }
 
+.live-map {
+  min-height: 340px;
+}
+
+.live-route {
+  fill: none;
+  stroke: var(--route-color);
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: var(--route-alpha);
+}
+
+.live-dot {
+  fill: var(--ok);
+  stroke: #ffffff;
+  stroke-width: 3;
+  opacity: .92;
+}
+
+.live-focus {
+  filter: drop-shadow(0 0 10px rgba(38,208,124,.55));
+}
+
+.live-label {
+  fill: #f8fafc;
+  font-size: 18px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: #0d1d30;
+  stroke-width: 5px;
+}
+
+.live-summary {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: .86rem;
+  line-height: 1.4;
+}
+
 .heatmap-wrap {
   overflow-x: visible;
   padding-bottom: 4px;
@@ -616,6 +686,7 @@ h2 {
   }
 
   .mapCard,
+  .liveMapCard,
   .weatherCard,
   .slotCard,
   .bandCard {
@@ -636,6 +707,24 @@ h2 {
 
   .path-map {
     min-height: 240px;
+  }
+
+  .live-head {
+    display: grid;
+  }
+
+  .live-controls {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 10px;
+  }
+
+  .live-controls label {
+    display: none;
+  }
+
+  .live-controls button {
+    grid-column: 1 / -1;
   }
 
 }
@@ -673,6 +762,10 @@ h2 {
   .path-map {
     min-height: 205px;
     border-radius: 14px;
+  }
+
+  .live-map {
+    min-height: 230px;
   }
 
   .space-weather {

@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
   <main class="wrap">
@@ -25,8 +25,8 @@
       </div>
       <div class="selectors" aria-label="Path controls">
         <div class="selectBox">
-          <label for="pathMode">Path type</label>
-          <select id="pathMode">
+          <label for="aMode">Region A type</label>
+          <select id="aMode">
             <option value="country" selected>Country / region</option>
             <option value="cq">CQ zone</option>
             <option value="itu">ITU zone</option>
@@ -56,6 +56,15 @@
           </div>
         </div>
         <div class="selectBox">
+          <label for="bMode">Region B type</label>
+          <select id="bMode">
+            <option value="country" selected>Country / region</option>
+            <option value="cq">CQ zone</option>
+            <option value="itu">ITU zone</option>
+            <option value="locator">Maidenhead locator</option>
+          </select>
+        </div>
+        <div class="selectBox">
           <label id="bInputLabel" for="bCountry">Region B</label>
           <div class="combo">
             <input id="bCountry" autocomplete="off" value="New Zealand" aria-label="Region B country or area">
@@ -76,7 +85,7 @@
           <button id="runBtn" class="primary" type="button">Run path check</button>
         </div>
       </div>
-      <p class="modeNote" id="modeNote">Type countries or regions such as Scotland, New Zealand, USA East Coast, or Japan.</p>
+      <p class="modeNote" id="modeNote">Mix country, CQ zone, ITU zone, or Maidenhead locator on either side of the path.</p>
     </header>
 
     <section class="status" id="status" role="status">Ready.</section>
@@ -114,6 +123,32 @@
         <span id="mapMeta"></span>
       </div>
       <div class="path-map" id="pathMap" aria-label="Selected radio path map"></div>
+    </section>
+
+    <section class="card liveMapCard">
+      <div class="section-head live-head">
+        <div>
+          <h2>Live Openings</h2>
+          <span id="liveMapMeta">Recent WSPR signals using Region A</span>
+        </div>
+        <div class="live-controls">
+          <label for="liveWindow">Window</label>
+          <select id="liveWindow">
+            <option value="15" selected>15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">1 hour</option>
+          </select>
+          <label for="liveDirection">Flow</label>
+          <select id="liveDirection">
+            <option value="both" selected>Sent and heard</option>
+            <option value="sent">Sent from A</option>
+            <option value="heard">Heard in A</option>
+          </select>
+          <button id="liveRefreshBtn" type="button">Live refresh</button>
+        </div>
+      </div>
+      <div class="path-map live-map" id="liveMap" aria-label="Live WSPR openings map"></div>
+      <div class="live-summary" id="liveSummary">Waiting for live spots.</div>
     </section>
 
     <section class="card weatherCard space-weather quiet" id="spaceWeather" aria-label="Space weather">
@@ -170,6 +205,6 @@
       100W estimates scale WSPR SNR by reported TX power.
     </footer>
   </main>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>
