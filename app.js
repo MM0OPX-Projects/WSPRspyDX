@@ -319,9 +319,10 @@ function renderLiveMap(focus, rows, minutes, flow) {
   const hotBands = [...rows.reduce((map, row) => {
     const band = Number(row.band);
     const workability = liveWorkability(row);
-    const current = map.get(band) || { band, spots: 0, workable: 0, bestSnr: -99, best100w: -99 };
+    const current = map.get(band) || { band, spots: 0, workable: 0, bestRank: 0, bestSnr: -99, best100w: -99 };
     current.spots += 1;
     if (workability.rank >= 1) current.workable += 1;
+    current.bestRank = Math.max(current.bestRank, workability.rank);
     current.bestSnr = Math.max(current.bestSnr, Number(row.snr));
     current.best100w = Math.max(current.best100w, workability.snr100w);
     map.set(band, current);
@@ -330,9 +331,10 @@ function renderLiveMap(focus, rows, minutes, flow) {
     .sort((a, b) => b.spots - a.spots || b.bestSnr - a.bestSnr)
     .slice(0, 6);
   const hotCountries = [...enrichedRows.reduce((map, row) => {
-    const current = map.get(row.remoteCountry) || { country: row.remoteCountry, spots: 0, workable: 0, best100w: -99 };
+    const current = map.get(row.remoteCountry) || { country: row.remoteCountry, spots: 0, workable: 0, bestRank: 0, best100w: -99 };
     current.spots += 1;
     if (row.rank >= 1) current.workable += 1;
+    current.bestRank = Math.max(current.bestRank, row.rank);
     current.best100w = Math.max(current.best100w, row.snr100w);
     map.set(row.remoteCountry, current);
     return map;
@@ -341,6 +343,7 @@ function renderLiveMap(focus, rows, minutes, flow) {
     .slice(0, 6);
   const workableRows = enrichedRows.filter((row) => row.rank >= 1);
   const best100w = Math.max(-99, ...enrichedRows.map((row) => row.snr100w));
+  const bestLiveRank = Math.max(0, ...enrichedRows.map((row) => row.rank));
   const maxSnr = Math.max(-30, ...enrichedRows.map((row) => Number(row.snr)));
   const minSnr = Math.min(10, ...enrichedRows.map((row) => Number(row.snr)));
   const strength = (snr) => {
@@ -370,17 +373,17 @@ function renderLiveMap(focus, rows, minutes, flow) {
   els.liveBands.innerHTML = hotBands.length ? hotBands.map((band) => `
     <span class="live-band-chip" style="--band-color:${bandColor(band.band)}">
       <b>${bandLabel(band.band)}</b>
-      <span>${spotCountText(band.spots)} · ${band.workable.toLocaleString()} FT8+</span>
+      <span>${spotCountText(band.spots)} · ${compactModeLabel(band.bestRank)}</span>
     </span>
   `).join("") : `<span class="live-band-empty">No hot bands in this window.</span>`;
   els.liveCountries.innerHTML = hotCountries.length ? hotCountries.map((item) => `
     <span class="live-country-chip">
       <b>${item.country}</b>
-      <span>${spotCountText(item.spots)} · ${item.workable.toLocaleString()} FT8+</span>
+      <span>${spotCountText(item.spots)} · ${compactModeLabel(item.bestRank)}</span>
     </span>
   `).join("") : `<span class="live-band-empty">No hot countries in this window.</span>`;
   els.livePower.textContent = rows.length
-    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${rows.length.toLocaleString()} live spots reach FT8 threshold or better; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
+    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${rows.length.toLocaleString()} live spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
     : "100W estimate waiting for live spots.";
   els.liveSummary.textContent = enrichedRows.length
     ? `Latest spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
@@ -421,6 +424,13 @@ function modeSummary(snr100w) {
   if (rank >= 2) return "CW/FT8 likely at 100W";
   if (rank >= 1) return "FT8 likely at 100W";
   return "Below FT8 threshold at 100W";
+}
+
+function compactModeLabel(rank) {
+  if (rank >= 3) return "SSB";
+  if (rank >= 2) return "CW";
+  if (rank >= 1) return "FT8";
+  return "No 100W mode";
 }
 
 function scaledText(snr, powerDbm) {
