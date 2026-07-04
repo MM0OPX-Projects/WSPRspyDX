@@ -352,6 +352,35 @@ h2 {
   font-size: .86rem;
 }
 
+.live-bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.live-band-chip,
+.live-band-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-left: 5px solid var(--band-color, var(--muted));
+  border-radius: 12px;
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.live-band-chip span,
+.live-band-empty {
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .space-weather {
   display: grid;
   grid-template-columns: 1fr;
@@ -553,7 +582,7 @@ h2 {
 }
 
 .live-dot {
-  fill: var(--ok);
+  fill: var(--band-color, var(--ok));
   stroke: #ffffff;
   stroke-width: 3;
   opacity: .92;

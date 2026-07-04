@@ -70,6 +70,10 @@ const bandLabels = new Map([
   [1, "160m"], [3, "80m"], [5, "60m"], [7, "40m"], [10, "30m"], [14, "20m"],
   [18, "17m"], [21, "15m"], [24, "12m"], [28, "10m"], [50, "6m"]
 ]);
+const bandColors = new Map([
+  [1, "#a78bfa"], [3, "#60a5fa"], [5, "#22d3ee"], [7, "#26d07c"], [10, "#84cc16"], [14, "#f6c945"],
+  [18, "#fb923c"], [21, "#f05a28"], [24, "#f472b6"], [28, "#ff5c67"], [50, "#c084fc"]
+]);
 
 const els = {
   aMode: document.querySelector("#aMode"),
@@ -103,6 +107,7 @@ const els = {
   mapMeta: document.querySelector("#mapMeta"),
   liveMap: document.querySelector("#liveMap"),
   liveMapMeta: document.querySelector("#liveMapMeta"),
+  liveBands: document.querySelector("#liveBands"),
   liveSummary: document.querySelector("#liveSummary"),
   slotList: document.querySelector("#slotList"),
   bandChanceList: document.querySelector("#bandChanceList"),
@@ -127,6 +132,15 @@ function normaliseName(value) {
 
 function bandLabel(band) {
   return bandLabels.get(Number(band)) || `${band} MHz`;
+}
+
+function bandColor(band) {
+  return bandColors.get(Number(band)) || "#bad4ef";
+}
+
+function spotCountText(count) {
+  const clean = Number(count) || 0;
+  return `${clean.toLocaleString()} ${clean === 1 ? "spot" : "spots"}`;
 }
 
 function setStatus(message, isError = false) {
@@ -241,6 +255,16 @@ function renderLiveMap(focus, rows, minutes, flow) {
   const viewWidth = 1536;
   const viewHeight = 1024;
   const focusPoint = mapProject(boxCenter(focus));
+  const hotBands = [...rows.reduce((map, row) => {
+    const band = Number(row.band);
+    const current = map.get(band) || { band, spots: 0, bestSnr: -99 };
+    current.spots += 1;
+    current.bestSnr = Math.max(current.bestSnr, Number(row.snr));
+    map.set(band, current);
+    return map;
+  }, new Map()).values()]
+    .sort((a, b) => b.spots - a.spots || b.bestSnr - a.bestSnr)
+    .slice(0, 6);
   const maxSnr = Math.max(-30, ...rows.map((row) => Number(row.snr)));
   const minSnr = Math.min(10, ...rows.map((row) => Number(row.snr)));
   const strength = (snr) => {
@@ -256,10 +280,10 @@ function renderLiveMap(focus, rows, minutes, flow) {
     const midX = (focusPoint.x + remote.x) / 2;
     const midY = (focusPoint.y + remote.y) / 2 - curve;
     const alpha = strength(row.snr);
-    const color = sentFromFocus ? "var(--blue)" : "var(--good)";
+    const color = bandColor(row.band);
     return `
       <path class="live-route" style="--route-color:${color};--route-alpha:${alpha.toFixed(2)}" d="M ${focusPoint.x.toFixed(1)} ${focusPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${remote.x.toFixed(1)} ${remote.y.toFixed(1)}"></path>
-      <circle class="live-dot" cx="${remote.x.toFixed(1)}" cy="${remote.y.toFixed(1)}" r="${Math.max(5, Math.min(13, 5 + alpha * 9)).toFixed(1)}">
+      <circle class="live-dot" style="--band-color:${color}" cx="${remote.x.toFixed(1)}" cy="${remote.y.toFixed(1)}" r="${Math.max(5, Math.min(13, 5 + alpha * 9)).toFixed(1)}">
         <title>${sentFromFocus ? row.rx_sign : row.tx_sign} ${bandLabel(row.band)} ${row.snr} dB</title>
       </circle>
       ${index < 10 ? `<text class="live-label" x="${Math.min(viewWidth - 230, Math.max(24, remote.x + 13)).toFixed(1)}" y="${Math.min(viewHeight - 28, Math.max(32, remote.y - 9)).toFixed(1)}">${bandLabel(row.band)}</text>` : ""}
@@ -267,6 +291,12 @@ function renderLiveMap(focus, rows, minutes, flow) {
   }).join("");
   const flowText = flow === "sent" ? "sent from" : flow === "heard" ? "heard in" : "sent/heard by";
   els.liveMapMeta.textContent = `${rows.length.toLocaleString()} spots ${flowText} ${focus.name}, last ${minutes} min`;
+  els.liveBands.innerHTML = hotBands.length ? hotBands.map((band) => `
+    <span class="live-band-chip" style="--band-color:${bandColor(band.band)}">
+      <b>${bandLabel(band.band)}</b>
+      <span>${spotCountText(band.spots)}</span>
+    </span>
+  `).join("") : `<span class="live-band-empty">No hot bands in this window.</span>`;
   els.liveSummary.textContent = rows.length
     ? `Latest spot ${rows[0].tx_sign} to ${rows[0].rx_sign} on ${bandLabel(rows[0].band)}, ${rows[0].snr} dB.`
     : `No live WSPR spots found for ${focus.name} in the last ${minutes} minutes.`;
