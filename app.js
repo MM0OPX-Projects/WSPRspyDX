@@ -66,6 +66,7 @@ const countryTimers = new Map();
 
 const bands = [1, 3, 5, 7, 10, 14, 18, 21, 24, 28, 50];
 const bandSqlList = bands.join(",");
+const liveRowLimit = 1200;
 const bandLabels = new Map([
   [1, "160m"], [3, "80m"], [5, "60m"], [7, "40m"], [10, "30m"], [14, "20m"],
   [18, "17m"], [21, "15m"], [24, "12m"], [28, "10m"], [50, "6m"]
@@ -93,19 +94,25 @@ const countryPrefixes = [
   [/^(PY|PP|PQ|PR|PS|PT|PU|PV|PW|PX|ZV|ZW|ZX|ZY|ZZ)/, "Brazil"],
   [/^(PA|PB|PC|PD|PE|PF|PG|PH|PI)/, "Netherlands"],
   [/^(ON|OO|OP|OQ|OR|OS|OT)/, "Belgium"],
-  [/^(HB9|HB3)/, "Switzerland"],
+  [/^(HB9|HB4|HB3)/, "Switzerland"],
   [/^(OE)/, "Austria"],
   [/^(LA|LB|LC|LD|LE|LF|LG|LH|LI|LJ|LK|LL|LM|LN)/, "Norway"],
   [/^(SM|SA|SB|SC|SD|SE|SF|SG|SH|SI|SJ|SK|SL|SM)/, "Sweden"],
   [/^(OH|OF|OG|OI)/, "Finland"],
   [/^(OZ|5P|5Q)/, "Denmark"],
   [/^(SP|SQ|SN|SO|HF|3Z)/, "Poland"],
+  [/^(SR)/, "Poland"],
   [/^(OK|OL)/, "Czechia"],
   [/^(OM)/, "Slovakia"],
   [/^(HA|HG)/, "Hungary"],
+  [/^(9A)/, "Croatia"],
+  [/^(YU|YT|YZ)/, "Serbia"],
   [/^(LZ)/, "Bulgaria"],
   [/^(YO|YR)/, "Romania"],
   [/^(SV|SX|SY|SZ)/, "Greece"],
+  [/^(LX)/, "Luxembourg"],
+  [/^(YL)/, "Latvia"],
+  [/^(R|RA|RB|RC|RD|RE|RF|RG|RH|RI|RJ|RK|RL|RM|RN|RO|RP|RQ|RR|RS|RT|RU|RV|RW|RX|RY|RZ|UA|UB|UC|UD|UE|UF|UG|UH|UI)/, "Russia"],
   [/^(TA|TB|TC|YM)/, "Turkey"],
   [/^(4X|4Z)/, "Israel"],
   [/^(ZS|ZR|ZU)/, "South Africa"],
@@ -189,8 +196,15 @@ function spotCountText(count) {
   return `${clean.toLocaleString()} ${clean === 1 ? "spot" : "spots"}`;
 }
 
+function normaliseCallsign(callsign) {
+  const clean = String(callsign || "").toUpperCase().trim();
+  if (!clean.includes("/")) return clean;
+  const parts = clean.split("/").filter(Boolean);
+  return parts.find((part) => /[A-Z]/.test(part) && /\d/.test(part)) || parts[0] || clean;
+}
+
 function callsignCountry(callsign) {
-  const clean = String(callsign || "").toUpperCase().replace(/^[A-Z0-9]+\//, "");
+  const clean = normaliseCallsign(callsign);
   const match = countryPrefixes.find(([pattern]) => pattern.test(clean));
   return match ? match[1] : "Unknown";
 }
@@ -315,10 +329,11 @@ function liveMinDistanceKm() {
   return cleanValue;
 }
 
-function renderLiveMap(focus, rows, minutes, flow, minDistance = 0) {
+function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = null) {
   const viewWidth = 1536;
   const viewHeight = 1024;
   const focusPoint = mapProject(boxCenter(focus));
+  const totalSpots = Number(totals?.spots ?? rows.length);
   const enrichedRows = rows.map((row) => {
     const remoteSign = row.flow === "sent" ? row.rx_sign : row.tx_sign;
     const workability = liveWorkability(row);
@@ -371,14 +386,17 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0) {
     return `
       <path class="live-route" style="--route-color:${color};--route-alpha:${alpha.toFixed(2)}" d="M ${focusPoint.x.toFixed(1)} ${focusPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${remote.x.toFixed(1)} ${remote.y.toFixed(1)}"></path>
       <circle class="live-dot" style="--band-color:${color}" cx="${remote.x.toFixed(1)}" cy="${remote.y.toFixed(1)}" r="${Math.max(5, Math.min(13, 5 + alpha * 9)).toFixed(1)}">
-        <title>${row.remoteSign} ${row.remoteCountry} ${bandLabel(row.band)} ${row.snr} dB, 100W est ${row.snr100w.toFixed(0)} dB</title>
+        <title>${row.remoteSign} ${row.remoteCountry} ${bandLabel(row.band)} ${Number(row.distance).toLocaleString()} km, ${row.snr} dB, 100W est ${row.snr100w.toFixed(0)} dB</title>
       </circle>
       ${index < 10 ? `<text class="live-label" x="${Math.min(viewWidth - 230, Math.max(24, remote.x + 13)).toFixed(1)}" y="${Math.min(viewHeight - 28, Math.max(32, remote.y - 9)).toFixed(1)}">${bandLabel(row.band)}</text>` : ""}
     `;
   }).join("");
   const flowText = flow === "sent" ? "sent from" : flow === "heard" ? "heard in" : "sent/heard by";
   const distanceText = minDistance > 0 ? `, min ${minDistance.toLocaleString()} km` : "";
-  els.liveMapMeta.textContent = `${rows.length.toLocaleString()} spots ${flowText} ${focus.name}, last ${minutes} min${distanceText}`;
+  const countText = rows.length < totalSpots
+    ? `${rows.length.toLocaleString()} farthest of ${totalSpots.toLocaleString()} spots`
+    : `${rows.length.toLocaleString()} spots`;
+  els.liveMapMeta.textContent = `${countText} ${flowText} ${focus.name}, last ${minutes} min${distanceText}`;
   els.liveBands.innerHTML = hotBands.length ? hotBands.map((band) => `
     <span class="live-band-chip" style="--band-color:${bandColor(band.band)}">
       <b>${bandLabel(band.band)}</b>
@@ -392,10 +410,10 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0) {
     </span>
   `).join("") : `<span class="live-band-empty">No hot countries in this window.</span>`;
   els.livePower.textContent = rows.length
-    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${rows.length.toLocaleString()} live spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
+    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${rows.length.toLocaleString()} displayed spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
     : "100W estimate waiting for live spots.";
   els.liveSummary.textContent = enrichedRows.length
-    ? `Latest spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
+    ? `Farthest displayed spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${Number(enrichedRows[0].distance).toLocaleString()} km, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
     : `No live WSPR spots found for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""} in the last ${minutes} minutes.`;
   els.liveMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="Live WSPR openings from ${focus.name}">
@@ -891,6 +909,7 @@ async function runLiveMap() {
         rx_sign,
         snr,
         power,
+        distance,
         if(${focusTx}, 'sent', 'heard') AS flow,
         if(${focusTx}, rx_lat, tx_lat) AS remote_lat,
         if(${focusTx}, rx_lon, tx_lon) AS remote_lon
@@ -903,12 +922,23 @@ async function runLiveMap() {
         AND tx_lon BETWEEN -180 AND 180
         AND rx_lon BETWEEN -180 AND 180
         AND distance >= ${minDistance}
-      ORDER BY time DESC
-      LIMIT 120`;
+      ORDER BY distance DESC, time DESC
+      LIMIT ${liveRowLimit}`;
+    const totalSql = `
+      SELECT count() AS spots, max(distance) AS max_distance
+      FROM wspr.rx
+      WHERE time >= now() - INTERVAL ${minutes} MINUTE
+        AND band IN (${bandSqlList})
+        AND ${flowWhere}
+        AND tx_lat BETWEEN -90 AND 90
+        AND rx_lat BETWEEN -90 AND 90
+        AND tx_lon BETWEEN -180 AND 180
+        AND rx_lon BETWEEN -180 AND 180
+        AND distance >= ${minDistance}`;
     els.liveRefreshBtn.disabled = true;
     els.liveSummary.textContent = `Checking live WSPR spots for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""}...`;
-    const rows = await runQuery(sql);
-    renderLiveMap(focus, rows, minutes, flow, minDistance);
+    const [rows, totalRows] = await Promise.all([runQuery(sql), runQuery(totalSql)]);
+    renderLiveMap(focus, rows, minutes, flow, minDistance, totalRows[0]);
   } catch (error) {
     els.liveMapMeta.textContent = "Live WSPR map";
     els.liveSummary.textContent = error.message;
