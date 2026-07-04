@@ -152,7 +152,6 @@ const els = {
   spaceWeatherTitle: document.querySelector("#spaceWeatherTitle"),
   spaceWeatherBody: document.querySelector("#spaceWeatherBody"),
   customDetails: document.querySelector("#customDetails"),
-  scoreStrip: document.querySelector("#scoreStrip"),
   heatmap: document.querySelector("#heatmap"),
   pathMap: document.querySelector("#pathMap"),
   mapMeta: document.querySelector("#mapMeta"),
@@ -329,6 +328,19 @@ function liveMinDistanceKm() {
   return cleanValue;
 }
 
+function hasUsableRemoteGeo(row) {
+  const lat = Number(row.remote_lat);
+  const lon = Number(row.remote_lon);
+  return Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180 &&
+    !(lat === 0 && lon === 0) &&
+    row.remoteCountry !== "Unknown";
+}
+
 function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = null) {
   const viewWidth = 1536;
   const viewHeight = 1024;
@@ -338,16 +350,16 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
     const remoteSign = row.flow === "sent" ? row.rx_sign : row.tx_sign;
     const workability = liveWorkability(row);
     return { ...row, remoteSign, remoteCountry: callsignCountry(remoteSign), ...workability };
-  });
-  const hotBands = [...rows.reduce((map, row) => {
+  }).filter(hasUsableRemoteGeo);
+  const removedRows = rows.length - enrichedRows.length;
+  const hotBands = [...enrichedRows.reduce((map, row) => {
     const band = Number(row.band);
-    const workability = liveWorkability(row);
     const current = map.get(band) || { band, spots: 0, workable: 0, bestRank: 0, bestSnr: -99, best100w: -99 };
     current.spots += 1;
-    if (workability.rank >= 1) current.workable += 1;
-    current.bestRank = Math.max(current.bestRank, workability.rank);
+    if (row.rank >= 1) current.workable += 1;
+    current.bestRank = Math.max(current.bestRank, row.rank);
     current.bestSnr = Math.max(current.bestSnr, Number(row.snr));
-    current.best100w = Math.max(current.best100w, workability.snr100w);
+    current.best100w = Math.max(current.best100w, row.snr100w);
     map.set(band, current);
     return map;
   }, new Map()).values()]
@@ -393,9 +405,9 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
   }).join("");
   const flowText = flow === "sent" ? "sent from" : flow === "heard" ? "heard in" : "sent/heard by";
   const distanceText = minDistance > 0 ? `, min ${minDistance.toLocaleString()} km` : "";
-  const countText = rows.length < totalSpots
-    ? `${rows.length.toLocaleString()} farthest of ${totalSpots.toLocaleString()} spots`
-    : `${rows.length.toLocaleString()} spots`;
+  const countText = enrichedRows.length < totalSpots
+    ? `${enrichedRows.length.toLocaleString()} mapped of ${totalSpots.toLocaleString()} spots`
+    : `${enrichedRows.length.toLocaleString()} mapped spots`;
   els.liveMapMeta.textContent = `${countText} ${flowText} ${focus.name}, last ${minutes} min${distanceText}`;
   els.liveBands.innerHTML = hotBands.length ? hotBands.map((band) => `
     <span class="live-band-chip" style="--band-color:${bandColor(band.band)}">
@@ -409,12 +421,15 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
       <span>${spotCountText(item.spots)} · ${compactModeLabel(item.bestRank)}</span>
     </span>
   `).join("") : `<span class="live-band-empty">No hot countries in this window.</span>`;
-  els.livePower.textContent = rows.length
-    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${rows.length.toLocaleString()} displayed spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
+  els.livePower.textContent = enrichedRows.length
+    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${enrichedRows.length.toLocaleString()} mapped spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
     : "100W estimate waiting for live spots.";
   els.liveSummary.textContent = enrichedRows.length
     ? `Farthest displayed spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${Number(enrichedRows[0].distance).toLocaleString()} km, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
-    : `No live WSPR spots found for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""} in the last ${minutes} minutes.`;
+    : `No geolocated live WSPR spots found for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""} in the last ${minutes} minutes.`;
+  if (removedRows > 0 && enrichedRows.length) {
+    els.liveSummary.textContent += ` Removed ${removedRows.toLocaleString()} spot${removedRows === 1 ? "" : "s"} without usable station geography.`;
+  }
   els.liveMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="Live WSPR openings from ${focus.name}">
       <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
@@ -763,27 +778,6 @@ function heatColor(count, max) {
   return `hsl(${hue} 82% ${light}%)`;
 }
 
-function renderScores(rows) {
-  const byBand = new Map();
-  rows.forEach((row) => {
-    const current = byBand.get(row.band) || { band: row.band, spots: 0, best_snr: -99, activeHours: 0 };
-    current.spots += Number(row.spots);
-    current.best_snr = Math.max(current.best_snr, Number(row.best_snr));
-    current.activeHours += 1;
-    byBand.set(row.band, current);
-  });
-
-  const cards = [...byBand.values()].sort((a, b) => b.spots - a.spots).slice(0, 4);
-  els.scoreStrip.innerHTML = cards.length ? cards.map((card) => `
-    <article class="score-card">
-      <div class="band">${bandLabel(card.band)}</div>
-      <strong>${card.spots.toLocaleString()}</strong>
-      <div class="metric">${card.activeHours} active UTC hours</div>
-      <div class="metric">Best SNR ${card.best_snr} dB</div>
-    </article>
-  `).join("") : `<article class="score-card"><div class="band">No spots</div><div class="metric">Try a longer history window or wider boxes.</div></article>`;
-}
-
 function renderHeatmap(rows) {
   const max = Math.max(1, ...rows.map((row) => Number(row.spots)));
   const lookup = new Map(rows.map((row) => [`${row.band}-${row.hour}`, row]));
@@ -829,7 +823,7 @@ function renderBandChances(rows) {
     const hourMap = new Map(data.rows.map((row) => [Number(row.hour), row]));
     let bestWindow = { start: 0, spots: -1, best: data.rows[0], snr100w: -Infinity, mode: 0 };
     for (let start = 0; start < 24; start += 1) {
-      const windowRows = [0, 1, 2].map((offset) => hourMap.get((start + offset) % 24)).filter(Boolean);
+      const windowRows = [0, 1].map((offset) => hourMap.get((start + offset) % 24)).filter(Boolean);
       const spots = windowRows.reduce((sum, row) => sum + Number(row.spots), 0);
       const best = windowRows.sort((a, b) => Number(b.best_snr) - Number(a.best_snr))[0] || data.rows[0];
       const snr100w = scaledSnr(best.best_snr, best.best_power);
@@ -842,7 +836,7 @@ function renderBandChances(rows) {
         bestWindow = { start, spots, best, snr100w, mode };
       }
     }
-    const end = (bestWindow.start + 3) % 24;
+    const end = (bestWindow.start + 2) % 24;
     const windowText = `${String(bestWindow.start).padStart(2, "0")}:00-${String(end).padStart(2, "0")}:00 UTC`;
     return {
       band,
@@ -866,7 +860,7 @@ function renderBandChances(rows) {
         <span>${bandLabel(chance.band)} best chance</span>
         <span>${chance.windowText}</span>
       </div>
-      <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 3h window, ${chance.total.toLocaleString()} total, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
+      <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 2h window, ${chance.total.toLocaleString()} total, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
       <div class="mode-hint">${scaledText(chance.best.best_snr, chance.best.best_power)}</div>
     </li>
   `).join("") : `<li>No per-band openings found.</li>`;
@@ -982,11 +976,13 @@ async function run() {
       SELECT time, band, tx_sign, tx_loc, rx_sign, rx_loc, distance, snr, power
       FROM wspr.rx
       WHERE ${since} AND band IN (${bandSqlList}) AND ${where}
+        AND tx_loc != ''
+        AND rx_loc != ''
+        AND distance > 0
       ORDER BY time DESC
-      LIMIT 30`;
+      LIMIT 10`;
 
     const [summary, latest] = await Promise.all([runQuery(summarySql), runQuery(latestSql)]);
-    renderScores(summary);
     renderPathMap(a, b);
     renderHeatmap(summary);
     renderSlots(summary);

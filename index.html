@@ -135,6 +135,42 @@
       </div>
     </section>
 
+    <section class="card weatherCard space-weather quiet" id="spaceWeather" aria-label="Space weather">
+      <div class="weatherGauge" id="spaceWeatherGauge" style="--gauge: 0">
+        <b id="spaceWeatherScore">--</b>
+        <span>Geomagnetic<br>field score</span>
+      </div>
+      <div class="weatherCopy">
+        <span class="weather-label">Space weather</span>
+        <strong id="spaceWeatherTitle">Checking NOAA Kp...</strong>
+        <p id="spaceWeatherBody">Recent geomagnetic activity can make current HF conditions differ from the historical WSPR pattern.</p>
+      </div>
+    </section>
+
+    <section class="card bandCard">
+      <div class="section-head">
+        <h2>Best By Band</h2>
+        <span>best 2h UTC window</span>
+      </div>
+      <ol class="slot-list" id="bandChanceList"></ol>
+    </section>
+
+    <section class="card slotCard">
+      <div class="section-head">
+        <h2>Best Slots</h2>
+        <span>ranked by spot count</span>
+      </div>
+      <ol class="slot-list" id="slotList"></ol>
+    </section>
+
+    <section class="card latestCard">
+      <div class="section-head">
+        <h2>Latest Spots</h2>
+        <span id="latestMeta"></span>
+      </div>
+      <div class="latest" id="latest"></div>
+    </section>
+
     <section class="card liveMapCard">
       <div class="section-head live-head">
         <div>
@@ -173,44 +209,6 @@
       <div class="path-map live-map" id="liveMap" aria-label="Live WSPR openings map"></div>
       <div class="live-summary" id="liveSummary">Waiting for live spots.</div>
     </section>
-
-    <section class="card weatherCard space-weather quiet" id="spaceWeather" aria-label="Space weather">
-      <div class="weatherGauge" id="spaceWeatherGauge" style="--gauge: 0">
-        <b id="spaceWeatherScore">--</b>
-        <span>Geomagnetic<br>field score</span>
-      </div>
-      <div class="weatherCopy">
-        <span class="weather-label">Space weather</span>
-        <strong id="spaceWeatherTitle">Checking NOAA Kp...</strong>
-        <p id="spaceWeatherBody">Recent geomagnetic activity can make current HF conditions differ from the historical WSPR pattern.</p>
-      </div>
-    </section>
-
-    <section class="card bandCard">
-      <div class="section-head">
-        <h2>Best By Band</h2>
-        <span>best 3h UTC window</span>
-      </div>
-      <ol class="slot-list" id="bandChanceList"></ol>
-    </section>
-
-    <section class="card slotCard">
-      <div class="section-head">
-        <h2>Best Slots</h2>
-        <span>ranked by spot count</span>
-      </div>
-      <ol class="slot-list" id="slotList"></ol>
-    </section>
-
-    <section class="score-strip" id="scoreStrip" aria-label="Band summary"></section>
-
-    <section class="card latestCard">
-      <div class="section-head">
-        <h2>Latest Spots</h2>
-        <span id="latestMeta"></span>
-      </div>
-      <div class="latest" id="latest"></div>
-    </section>
     </div>
 
     <footer class="source-note">
@@ -218,6 +216,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=33"></script>
 </body>
 </html>
