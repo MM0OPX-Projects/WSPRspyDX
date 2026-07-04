@@ -331,7 +331,7 @@ h2 {
 
 .live-controls {
   display: grid;
-  grid-template-columns: auto minmax(92px, 130px) auto minmax(126px, 170px) minmax(120px, 150px);
+  grid-template-columns: auto minmax(92px, 130px) auto minmax(126px, 170px) auto minmax(96px, 140px) minmax(120px, 150px);
   gap: 8px;
   align-items: center;
 }
@@ -346,10 +346,15 @@ h2 {
 }
 
 .live-controls select,
+.live-controls input,
 .live-controls button {
   min-height: 38px;
   border-radius: 10px;
   font-size: .86rem;
+}
+
+.live-controls input {
+  width: 100%;
 }
 
 .live-bands,

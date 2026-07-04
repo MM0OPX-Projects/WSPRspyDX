@@ -134,6 +134,7 @@ const els = {
   direction: document.querySelector("#direction"),
   liveWindow: document.querySelector("#liveWindow"),
   liveDirection: document.querySelector("#liveDirection"),
+  liveMinDistance: document.querySelector("#liveMinDistance"),
   liveRefreshBtn: document.querySelector("#liveRefreshBtn"),
   refreshBtn: document.querySelector("#refreshBtn"),
   runBtn: document.querySelector("#runBtn"),
@@ -307,7 +308,14 @@ function renderPathMap(a, b) {
   `;
 }
 
-function renderLiveMap(focus, rows, minutes, flow) {
+function liveMinDistanceKm() {
+  const value = Math.round(Number(els.liveMinDistance.value) || 0);
+  const cleanValue = Math.max(0, Math.min(20040, value));
+  els.liveMinDistance.value = String(cleanValue);
+  return cleanValue;
+}
+
+function renderLiveMap(focus, rows, minutes, flow, minDistance = 0) {
   const viewWidth = 1536;
   const viewHeight = 1024;
   const focusPoint = mapProject(boxCenter(focus));
@@ -369,7 +377,8 @@ function renderLiveMap(focus, rows, minutes, flow) {
     `;
   }).join("");
   const flowText = flow === "sent" ? "sent from" : flow === "heard" ? "heard in" : "sent/heard by";
-  els.liveMapMeta.textContent = `${rows.length.toLocaleString()} spots ${flowText} ${focus.name}, last ${minutes} min`;
+  const distanceText = minDistance > 0 ? `, min ${minDistance.toLocaleString()} km` : "";
+  els.liveMapMeta.textContent = `${rows.length.toLocaleString()} spots ${flowText} ${focus.name}, last ${minutes} min${distanceText}`;
   els.liveBands.innerHTML = hotBands.length ? hotBands.map((band) => `
     <span class="live-band-chip" style="--band-color:${bandColor(band.band)}">
       <b>${bandLabel(band.band)}</b>
@@ -387,7 +396,7 @@ function renderLiveMap(focus, rows, minutes, flow) {
     : "100W estimate waiting for live spots.";
   els.liveSummary.textContent = enrichedRows.length
     ? `Latest spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
-    : `No live WSPR spots found for ${focus.name} in the last ${minutes} minutes.`;
+    : `No live WSPR spots found for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""} in the last ${minutes} minutes.`;
   els.liveMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="Live WSPR openings from ${focus.name}">
       <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
@@ -864,6 +873,7 @@ async function runLiveMap() {
     await resolvePathInput("a", false);
     const focus = readBox("a");
     const minutes = Math.min(60, Math.max(15, Number(els.liveWindow.value)));
+    const minDistance = liveMinDistanceKm();
     const flow = els.liveDirection.value;
     const focusTx = regionWhere("tx", focus);
     const focusRx = regionWhere("rx", focus);
@@ -892,17 +902,18 @@ async function runLiveMap() {
         AND rx_lat BETWEEN -90 AND 90
         AND tx_lon BETWEEN -180 AND 180
         AND rx_lon BETWEEN -180 AND 180
+        AND distance >= ${minDistance}
       ORDER BY time DESC
       LIMIT 120`;
     els.liveRefreshBtn.disabled = true;
-    els.liveSummary.textContent = `Checking live WSPR spots for ${focus.name}...`;
+    els.liveSummary.textContent = `Checking live WSPR spots for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""}...`;
     const rows = await runQuery(sql);
-    renderLiveMap(focus, rows, minutes, flow);
+    renderLiveMap(focus, rows, minutes, flow, minDistance);
   } catch (error) {
     els.liveMapMeta.textContent = "Live WSPR map";
     els.liveSummary.textContent = error.message;
     try {
-      renderLiveMap(readBox("a"), [], Number(els.liveWindow.value) || 15, els.liveDirection.value);
+      renderLiveMap(readBox("a"), [], Number(els.liveWindow.value) || 15, els.liveDirection.value, liveMinDistanceKm());
     } catch (mapError) {}
   } finally {
     els.liveRefreshBtn.disabled = false;
@@ -1066,6 +1077,10 @@ els.runBtn.addEventListener("click", run);
 els.liveRefreshBtn.addEventListener("click", runLiveMap);
 els.liveWindow.addEventListener("change", runLiveMap);
 els.liveDirection.addEventListener("change", runLiveMap);
+els.liveMinDistance.addEventListener("change", runLiveMap);
+els.liveMinDistance.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") runLiveMap();
+});
 els.refreshBtn.addEventListener("click", () => {
   loadSpaceWeather();
   run();

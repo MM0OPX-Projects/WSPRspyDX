@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=28">
+  <link rel="stylesheet" href="styles.css?v=29">
 </head>
 <body>
   <main class="wrap">
@@ -144,6 +144,16 @@
             <option value="sent">Sent from A</option>
             <option value="heard">Heard in A</option>
           </select>
+          <label for="liveMinDistance">Min km</label>
+          <input id="liveMinDistance" type="number" min="0" max="20040" step="100" value="0" list="liveDistanceOptions" inputmode="numeric" placeholder="Min km" aria-label="Live minimum distance in kilometres">
+          <datalist id="liveDistanceOptions">
+            <option value="0"></option>
+            <option value="500"></option>
+            <option value="1000"></option>
+            <option value="3000"></option>
+            <option value="5000"></option>
+            <option value="10000"></option>
+          </datalist>
           <button id="liveRefreshBtn" type="button">Live refresh</button>
         </div>
       </div>
@@ -208,6 +218,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=28"></script>
+  <script src="app.js?v=29"></script>
 </body>
 </html>
