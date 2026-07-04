@@ -74,6 +74,49 @@ const bandColors = new Map([
   [1, "#a78bfa"], [3, "#60a5fa"], [5, "#22d3ee"], [7, "#26d07c"], [10, "#84cc16"], [14, "#f6c945"],
   [18, "#fb923c"], [21, "#f05a28"], [24, "#f472b6"], [28, "#ff5c67"], [50, "#c084fc"]
 ]);
+const countryPrefixes = [
+  [/^(2M|GM|MM|MS)/, "Scotland"],
+  [/^(G|M|2E)/, "England"],
+  [/^(GW|MW|2W)/, "Wales"],
+  [/^(GI|MI|2I)/, "Northern Ireland"],
+  [/^(EI|EJ)/, "Ireland"],
+  [/^(ZL)/, "New Zealand"],
+  [/^(VK)/, "Australia"],
+  [/^(JA|JE|JF|JG|JH|JI|JJ|JK|JL|JM|JN|JO|JP|JQ|JR|JS|7J|7K|7L|7M|7N|8J|8N)/, "Japan"],
+  [/^(K|N|W|AA|AB|AC|AD|AE|AF|AG|AI|AJ|AK|KA|KB|KC|KD|KE|KF|KG|KI|KJ|KK|KL|KM|KN|KO|KP|KQ|KR|KS|KT|KU|KV|KW|KX|KY|KZ)/, "United States"],
+  [/^(VE|VA|VO|VY)/, "Canada"],
+  [/^(F|TM)/, "France"],
+  [/^(DL|DA|DB|DC|DD|DE|DF|DG|DH|DJ|DK|DM|DN|DO|DP|DQ|DR)/, "Germany"],
+  [/^(EA|EB|EC|ED|EE|EF|EG|EH|AM|AN|AO)/, "Spain"],
+  [/^(CT|CS|CR)/, "Portugal"],
+  [/^(I|IK|IU|IZ)/, "Italy"],
+  [/^(PY|PP|PQ|PR|PS|PT|PU|PV|PW|PX|ZV|ZW|ZX|ZY|ZZ)/, "Brazil"],
+  [/^(PA|PB|PC|PD|PE|PF|PG|PH|PI)/, "Netherlands"],
+  [/^(ON|OO|OP|OQ|OR|OS|OT)/, "Belgium"],
+  [/^(HB9|HB3)/, "Switzerland"],
+  [/^(OE)/, "Austria"],
+  [/^(LA|LB|LC|LD|LE|LF|LG|LH|LI|LJ|LK|LL|LM|LN)/, "Norway"],
+  [/^(SM|SA|SB|SC|SD|SE|SF|SG|SH|SI|SJ|SK|SL|SM)/, "Sweden"],
+  [/^(OH|OF|OG|OI)/, "Finland"],
+  [/^(OZ|5P|5Q)/, "Denmark"],
+  [/^(SP|SQ|SN|SO|HF|3Z)/, "Poland"],
+  [/^(OK|OL)/, "Czechia"],
+  [/^(OM)/, "Slovakia"],
+  [/^(HA|HG)/, "Hungary"],
+  [/^(LZ)/, "Bulgaria"],
+  [/^(YO|YR)/, "Romania"],
+  [/^(SV|SX|SY|SZ)/, "Greece"],
+  [/^(TA|TB|TC|YM)/, "Turkey"],
+  [/^(4X|4Z)/, "Israel"],
+  [/^(ZS|ZR|ZU)/, "South Africa"],
+  [/^(LU|LW|AY|AZ)/, "Argentina"],
+  [/^(CX)/, "Uruguay"],
+  [/^(CE|XQ|XR|3G)/, "Chile"],
+  [/^(YB|YC|YD|YE|YF|YG|YH)/, "Indonesia"],
+  [/^(DU|DV|DW|DX|4D|4E|4F|4G|4H|4I)/, "Philippines"],
+  [/^(HL|DS|DT|D7|D8|D9|6K|6L|6M|6N)/, "South Korea"],
+  [/^(BY|BA|BD|BG|BH|BI|BJ|BL|BM|BN|BO|BP|BQ|BR|BS|BT|BU|BV|BW|BX|3H|3I|3J|3K|3L|3M|3N|3O|3P|3Q|3R|3S|3T|3U)/, "China"]
+];
 
 const els = {
   aMode: document.querySelector("#aMode"),
@@ -108,6 +151,8 @@ const els = {
   liveMap: document.querySelector("#liveMap"),
   liveMapMeta: document.querySelector("#liveMapMeta"),
   liveBands: document.querySelector("#liveBands"),
+  liveCountries: document.querySelector("#liveCountries"),
+  livePower: document.querySelector("#livePower"),
   liveSummary: document.querySelector("#liveSummary"),
   slotList: document.querySelector("#slotList"),
   bandChanceList: document.querySelector("#bandChanceList"),
@@ -141,6 +186,17 @@ function bandColor(band) {
 function spotCountText(count) {
   const clean = Number(count) || 0;
   return `${clean.toLocaleString()} ${clean === 1 ? "spot" : "spots"}`;
+}
+
+function callsignCountry(callsign) {
+  const clean = String(callsign || "").toUpperCase().replace(/^[A-Z0-9]+\//, "");
+  const match = countryPrefixes.find(([pattern]) => pattern.test(clean));
+  return match ? match[1] : "Unknown";
+}
+
+function liveWorkability(row) {
+  const snr100w = scaledSnr(row.snr, row.power);
+  return { snr100w, rank: modeRank(snr100w) };
 }
 
 function setStatus(message, isError = false) {
@@ -255,23 +311,43 @@ function renderLiveMap(focus, rows, minutes, flow) {
   const viewWidth = 1536;
   const viewHeight = 1024;
   const focusPoint = mapProject(boxCenter(focus));
+  const enrichedRows = rows.map((row) => {
+    const remoteSign = row.flow === "sent" ? row.rx_sign : row.tx_sign;
+    const workability = liveWorkability(row);
+    return { ...row, remoteSign, remoteCountry: callsignCountry(remoteSign), ...workability };
+  });
   const hotBands = [...rows.reduce((map, row) => {
     const band = Number(row.band);
-    const current = map.get(band) || { band, spots: 0, bestSnr: -99 };
+    const workability = liveWorkability(row);
+    const current = map.get(band) || { band, spots: 0, workable: 0, bestSnr: -99, best100w: -99 };
     current.spots += 1;
+    if (workability.rank >= 1) current.workable += 1;
     current.bestSnr = Math.max(current.bestSnr, Number(row.snr));
+    current.best100w = Math.max(current.best100w, workability.snr100w);
     map.set(band, current);
     return map;
   }, new Map()).values()]
     .sort((a, b) => b.spots - a.spots || b.bestSnr - a.bestSnr)
     .slice(0, 6);
-  const maxSnr = Math.max(-30, ...rows.map((row) => Number(row.snr)));
-  const minSnr = Math.min(10, ...rows.map((row) => Number(row.snr)));
+  const hotCountries = [...enrichedRows.reduce((map, row) => {
+    const current = map.get(row.remoteCountry) || { country: row.remoteCountry, spots: 0, workable: 0, best100w: -99 };
+    current.spots += 1;
+    if (row.rank >= 1) current.workable += 1;
+    current.best100w = Math.max(current.best100w, row.snr100w);
+    map.set(row.remoteCountry, current);
+    return map;
+  }, new Map()).values()]
+    .sort((a, b) => b.spots - a.spots || b.best100w - a.best100w)
+    .slice(0, 6);
+  const workableRows = enrichedRows.filter((row) => row.rank >= 1);
+  const best100w = Math.max(-99, ...enrichedRows.map((row) => row.snr100w));
+  const maxSnr = Math.max(-30, ...enrichedRows.map((row) => Number(row.snr)));
+  const minSnr = Math.min(10, ...enrichedRows.map((row) => Number(row.snr)));
   const strength = (snr) => {
     const range = Math.max(1, maxSnr - minSnr);
     return Math.max(0.18, Math.min(1, (Number(snr) - minSnr) / range));
   };
-  const routes = rows.map((row, index) => {
+  const routes = enrichedRows.map((row, index) => {
     const sentFromFocus = row.flow === "sent";
     const remote = mapProject({ lat: Number(row.remote_lat), lon: Number(row.remote_lon) });
     const dx = remote.x - focusPoint.x;
@@ -284,7 +360,7 @@ function renderLiveMap(focus, rows, minutes, flow) {
     return `
       <path class="live-route" style="--route-color:${color};--route-alpha:${alpha.toFixed(2)}" d="M ${focusPoint.x.toFixed(1)} ${focusPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${remote.x.toFixed(1)} ${remote.y.toFixed(1)}"></path>
       <circle class="live-dot" style="--band-color:${color}" cx="${remote.x.toFixed(1)}" cy="${remote.y.toFixed(1)}" r="${Math.max(5, Math.min(13, 5 + alpha * 9)).toFixed(1)}">
-        <title>${sentFromFocus ? row.rx_sign : row.tx_sign} ${bandLabel(row.band)} ${row.snr} dB</title>
+        <title>${row.remoteSign} ${row.remoteCountry} ${bandLabel(row.band)} ${row.snr} dB, 100W est ${row.snr100w.toFixed(0)} dB</title>
       </circle>
       ${index < 10 ? `<text class="live-label" x="${Math.min(viewWidth - 230, Math.max(24, remote.x + 13)).toFixed(1)}" y="${Math.min(viewHeight - 28, Math.max(32, remote.y - 9)).toFixed(1)}">${bandLabel(row.band)}</text>` : ""}
     `;
@@ -294,11 +370,20 @@ function renderLiveMap(focus, rows, minutes, flow) {
   els.liveBands.innerHTML = hotBands.length ? hotBands.map((band) => `
     <span class="live-band-chip" style="--band-color:${bandColor(band.band)}">
       <b>${bandLabel(band.band)}</b>
-      <span>${spotCountText(band.spots)}</span>
+      <span>${spotCountText(band.spots)} · ${band.workable.toLocaleString()} FT8+</span>
     </span>
   `).join("") : `<span class="live-band-empty">No hot bands in this window.</span>`;
-  els.liveSummary.textContent = rows.length
-    ? `Latest spot ${rows[0].tx_sign} to ${rows[0].rx_sign} on ${bandLabel(rows[0].band)}, ${rows[0].snr} dB.`
+  els.liveCountries.innerHTML = hotCountries.length ? hotCountries.map((item) => `
+    <span class="live-country-chip">
+      <b>${item.country}</b>
+      <span>${spotCountText(item.spots)} · ${item.workable.toLocaleString()} FT8+</span>
+    </span>
+  `).join("") : `<span class="live-band-empty">No hot countries in this window.</span>`;
+  els.livePower.textContent = rows.length
+    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${rows.length.toLocaleString()} live spots reach FT8 threshold or better; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
+    : "100W estimate waiting for live spots.";
+  els.liveSummary.textContent = enrichedRows.length
+    ? `Latest spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
     : `No live WSPR spots found for ${focus.name} in the last ${minutes} minutes.`;
   els.liveMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="Live WSPR openings from ${focus.name}">

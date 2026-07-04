@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
   <main class="wrap">
@@ -25,15 +25,6 @@
       </div>
       <div class="selectors" aria-label="Path controls">
         <div class="selectBox">
-          <label for="aMode">Region A type</label>
-          <select id="aMode">
-            <option value="country" selected>Country / region</option>
-            <option value="cq">CQ zone</option>
-            <option value="itu">ITU zone</option>
-            <option value="locator">Maidenhead locator</option>
-          </select>
-        </div>
-        <div class="selectBox">
           <label for="period">History</label>
           <select id="period">
             <option value="1">1 day</option>
@@ -45,6 +36,15 @@
             <option value="20">20 days</option>
             <option value="30">30 days</option>
             <option value="90" selected>90 days</option>
+          </select>
+        </div>
+        <div class="selectBox">
+          <label for="aMode">Region A type</label>
+          <select id="aMode">
+            <option value="country" selected>Country / region</option>
+            <option value="cq">CQ zone</option>
+            <option value="itu">ITU zone</option>
+            <option value="locator">Maidenhead locator</option>
           </select>
         </div>
         <div class="selectBox">
@@ -148,6 +148,8 @@
         </div>
       </div>
       <div class="live-bands" id="liveBands" aria-label="Hot live bands"></div>
+      <div class="live-countries" id="liveCountries" aria-label="Hot live countries"></div>
+      <div class="live-power" id="livePower">100W estimate waiting for live spots.</div>
       <div class="path-map live-map" id="liveMap" aria-label="Live WSPR openings map"></div>
       <div class="live-summary" id="liveSummary">Waiting for live spots.</div>
     </section>
@@ -203,9 +205,9 @@
 
     <footer class="source-note">
       Data sources: <a href="https://wspr.live/" target="_blank" rel="noopener">WSPR Live</a> and NOAA/SWPC.
-      100W estimates scale WSPR SNR by reported TX power.
+      100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>

@@ -352,14 +352,16 @@ h2 {
   font-size: .86rem;
 }
 
-.live-bands {
+.live-bands,
+.live-countries {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 10px 0 12px;
+  margin: 10px 0 0;
 }
 
 .live-band-chip,
+.live-country-chip,
 .live-band-empty {
   display: inline-flex;
   align-items: center;
@@ -376,9 +378,26 @@ h2 {
 }
 
 .live-band-chip span,
+.live-country-chip span,
 .live-band-empty {
   color: var(--muted);
   font-weight: 800;
+}
+
+.live-country-chip {
+  border-left-color: var(--blue);
+}
+
+.live-power {
+  margin: 10px 0 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  background: rgba(255,255,255,.05);
+  color: #c5d4ea;
+  font-size: .84rem;
+  font-weight: 850;
+  line-height: 1.35;
 }
 
 .space-weather {
