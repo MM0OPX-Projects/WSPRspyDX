@@ -287,6 +287,10 @@ fieldset {
   grid-column: span 12;
 }
 
+.rbnCard {
+  grid-column: span 12;
+}
+
 .weatherCard {
   grid-column: span 12;
 }
@@ -355,6 +359,10 @@ h2 {
 
 .live-controls input {
   width: 100%;
+}
+
+.rbn-controls {
+  grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) minmax(110px, 140px);
 }
 
 .live-bands,
@@ -632,6 +640,32 @@ h2 {
   line-height: 1.4;
 }
 
+.rbn-table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.rbn-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #dceaff;
+  font-size: .82rem;
+}
+
+.rbn-table th,
+.rbn-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.rbn-table th {
+  color: #9fb9d7;
+  font-size: .7rem;
+  text-transform: uppercase;
+}
+
 .heatmap-wrap {
   overflow-x: visible;
   padding-bottom: 4px;
@@ -740,6 +774,7 @@ h2 {
 
   .mapCard,
   .liveMapCard,
+  .rbnCard,
   .weatherCard,
   .slotCard,
   .bandCard {
@@ -778,6 +813,10 @@ h2 {
 
   .live-controls button {
     grid-column: 1 / -1;
+  }
+
+  .rbn-controls {
+    grid-template-columns: 1fr 1fr;
   }
 
 }

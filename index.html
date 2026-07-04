@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=32">
+  <link rel="stylesheet" href="styles.css?v=35">
 </head>
 <body>
   <main class="wrap">
@@ -163,14 +163,6 @@
       <ol class="slot-list" id="slotList"></ol>
     </section>
 
-    <section class="card latestCard">
-      <div class="section-head">
-        <h2>Latest Spots</h2>
-        <span id="latestMeta"></span>
-      </div>
-      <div class="latest" id="latest"></div>
-    </section>
-
     <section class="card liveMapCard">
       <div class="section-head live-head">
         <div>
@@ -209,13 +201,39 @@
       <div class="path-map live-map" id="liveMap" aria-label="Live WSPR openings map"></div>
       <div class="live-summary" id="liveSummary">Waiting for live spots.</div>
     </section>
+
+    <section class="card rbnCard">
+      <div class="section-head live-head">
+        <div>
+          <h2>CW RBN Monitor</h2>
+          <span id="rbnMeta">Reverse Beacon Network spot lookup</span>
+        </div>
+        <div class="live-controls rbn-controls">
+          <label for="rbnCall">Call</label>
+          <input id="rbnCall" type="text" value="MM0OPX" placeholder="Callsign" autocapitalize="characters" spellcheck="false" aria-label="RBN callsign">
+          <label for="rbnWindow">Window</label>
+          <select id="rbnWindow">
+            <option value="900" selected>15 min</option>
+            <option value="1800">30 min</option>
+            <option value="3600">1 hour</option>
+            <option value="86400">24 hours</option>
+          </select>
+          <button id="rbnRunBtn" type="button">Run RBN</button>
+        </div>
+      </div>
+      <div class="path-map live-map" id="rbnMap" aria-label="Reverse Beacon Network map"></div>
+      <div class="rbn-table-wrap">
+        <table class="rbn-table" id="rbnTable" aria-label="Reverse Beacon Network spots"></table>
+      </div>
+      <div class="live-summary" id="rbnSummary">Enter a callsign and run a CW RBN lookup.</div>
+    </section>
     </div>
 
     <footer class="source-note">
-      Data sources: <a href="https://wspr.live/" target="_blank" rel="noopener">WSPR Live</a> and NOAA/SWPC.
+      Data sources: <a href="https://wspr.live/" target="_blank" rel="noopener">WSPR Live</a>, NOAA/SWPC, and <a href="https://www.reversebeacon.net/" target="_blank" rel="noopener">Reverse Beacon Network</a>.
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=33"></script>
+  <script src="app.js?v=35"></script>
 </body>
 </html>

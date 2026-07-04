@@ -1,6 +1,9 @@
 const endpoint = "https://db1.wspr.live/";
 const geocodeEndpoint = "https://nominatim.openstreetmap.org/search";
 const kpEndpoint = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
+const rbnEndpoint = "https://www.reversebeacon.net/spots.php";
+const rbnPageEndpoint = "https://www.reversebeacon.net/main.php";
+const rbnVersionHash = "ab6db5";
 
 const knownRegions = {
   scotland: { name: "Scotland", lat: 56.8, lon: -4.2, latMin: 54.5, latMax: 61.1, lonMin: -8.9, lonMax: -0.5 },
@@ -163,9 +166,14 @@ const els = {
   liveSummary: document.querySelector("#liveSummary"),
   slotList: document.querySelector("#slotList"),
   bandChanceList: document.querySelector("#bandChanceList"),
-  latest: document.querySelector("#latest"),
   queryMeta: document.querySelector("#queryMeta"),
-  latestMeta: document.querySelector("#latestMeta"),
+  rbnCall: document.querySelector("#rbnCall"),
+  rbnWindow: document.querySelector("#rbnWindow"),
+  rbnRunBtn: document.querySelector("#rbnRunBtn"),
+  rbnMeta: document.querySelector("#rbnMeta"),
+  rbnMap: document.querySelector("#rbnMap"),
+  rbnTable: document.querySelector("#rbnTable"),
+  rbnSummary: document.querySelector("#rbnSummary"),
   aName: document.querySelector("#aName"),
   aLatMin: document.querySelector("#aLatMin"),
   aLatMax: document.querySelector("#aLatMax"),
@@ -440,8 +448,181 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
   `;
 }
 
+function rbnBandFromCode(code) {
+  const lookup = new Map([[3, 160], [7, 80], [84, 60], [12, 40], [17, 30], [22, 20], [27, 17], [32, 15], [37, 12], [42, 10], [50, 6]]);
+  return lookup.get(Number(code)) || Number(code);
+}
+
+function rbnBandColor(code) {
+  const mhzBand = rbnBandFromCode(code);
+  const wsprBand = mhzBand === 160 ? 1 : mhzBand === 80 ? 3 : mhzBand === 60 ? 5 : mhzBand === 40 ? 7 : mhzBand === 30 ? 10 : mhzBand === 20 ? 14 : mhzBand === 17 ? 18 : mhzBand === 15 ? 21 : mhzBand === 12 ? 24 : mhzBand === 10 ? 28 : 50;
+  return bandColor(wsprBand);
+}
+
+function rbnUrl(call, seconds) {
+  const maxAge = seconds >= 86400 ? "24,hours" : `${Math.max(1, Math.round(seconds / 60))},minutes`;
+  const params = new URLSearchParams({
+    spotted_call: call,
+    modes: "cw",
+    rows: "100",
+    max_age: maxAge
+  });
+  return `${rbnPageEndpoint}?${params.toString()}`;
+}
+
+function parseRbnSpots(payload, call) {
+  const callInfo = payload.call_info || {};
+  return Object.entries(payload.spots || {}).map(([id, row]) => {
+    const [de, freq, dx, db, wpm, time, diff, band, type, mode, epoch] = row;
+    const deInfo = callInfo[de] || [];
+    const dxInfo = callInfo[dx] || [];
+    return {
+      id,
+      de,
+      dx,
+      freq,
+      db: Number(db),
+      wpm: Number(wpm),
+      time,
+      diff,
+      band,
+      bandMeters: rbnBandFromCode(band),
+      mode,
+      epoch: Number(epoch),
+      deCountry: deInfo[1] || "",
+      dxCountry: dxInfo[1] || "",
+      deLat: Number(deInfo[6]),
+      deLon: Number(deInfo[7]),
+      dxLat: Number(dxInfo[6]),
+      dxLon: Number(dxInfo[7])
+    };
+  }).filter((spot) => {
+    const cleanDx = String(spot.dx || "").toUpperCase();
+    return cleanDx === call &&
+      Number.isFinite(spot.deLat) &&
+      Number.isFinite(spot.deLon) &&
+      Number.isFinite(spot.dxLat) &&
+      Number.isFinite(spot.dxLon);
+  }).sort((a, b) => b.epoch - a.epoch);
+}
+
+function renderRbnMap(spots, call) {
+  const viewWidth = 1536;
+  const viewHeight = 1024;
+  if (!spots.length) {
+    els.rbnMap.innerHTML = `
+      <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="RBN spots map">
+        <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
+      </svg>
+    `;
+    return;
+  }
+  const target = mapProject({ lat: spots[0].dxLat, lon: spots[0].dxLon });
+  const routes = spots.slice(0, 80).map((spot, index) => {
+    const remote = mapProject({ lat: spot.deLat, lon: spot.deLon });
+    const dx = remote.x - target.x;
+    const dy = remote.y - target.y;
+    const curve = Math.min(120, Math.max(45, Math.hypot(dx, dy) * 0.1));
+    const midX = (target.x + remote.x) / 2;
+    const midY = (target.y + remote.y) / 2 - curve;
+    const color = rbnBandColor(spot.band);
+    return `
+      <path class="live-route" style="--route-color:${color};--route-alpha:.72" d="M ${target.x.toFixed(1)} ${target.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${remote.x.toFixed(1)} ${remote.y.toFixed(1)}"></path>
+      <circle class="live-dot" style="--band-color:${color}" cx="${remote.x.toFixed(1)}" cy="${remote.y.toFixed(1)}" r="8">
+        <title>${spot.de} heard ${spot.dx} on ${spot.bandMeters}m, ${spot.db} dB</title>
+      </circle>
+      ${index < 10 ? `<text class="live-label" x="${Math.min(viewWidth - 230, Math.max(24, remote.x + 13)).toFixed(1)}" y="${Math.min(viewHeight - 28, Math.max(32, remote.y - 9)).toFixed(1)}">${spot.bandMeters}m</text>` : ""}
+    `;
+  }).join("");
+  els.rbnMap.innerHTML = `
+    <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="RBN spots for ${call}">
+      <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
+      ${routes}
+      <circle class="map-pin a live-focus" cx="${target.x.toFixed(1)}" cy="${target.y.toFixed(1)}" r="14"></circle>
+      <text class="map-label" x="${Math.min(viewWidth - 240, Math.max(24, target.x + 18)).toFixed(1)}" y="${Math.min(viewHeight - 30, Math.max(36, target.y - 16)).toFixed(1)}">${call}</text>
+    </svg>
+  `;
+}
+
+function renderRbnTable(spots) {
+  els.rbnTable.innerHTML = spots.length ? `
+    <tr><th>UTC</th><th>Band</th><th>Spotter</th><th>Country</th><th>SNR</th><th>Speed</th><th>Freq</th></tr>
+    ${spots.slice(0, 30).map((spot) => `
+      <tr>
+        <td>${spot.time}</td>
+        <td>${spot.bandMeters}m</td>
+        <td>${spot.de}</td>
+        <td>${spot.deCountry}</td>
+        <td>${spot.db} dB</td>
+        <td>${spot.wpm || ""} wpm</td>
+        <td>${spot.freq}</td>
+      </tr>
+    `).join("")}
+  ` : "";
+}
+
+let rbnTimer;
+
+async function runRbnMonitor(openFallback = false) {
+  const call = els.rbnCall.value.trim().toUpperCase();
+  const seconds = Math.max(900, Number(els.rbnWindow.value) || 900);
+  if (!call) {
+    els.rbnSummary.textContent = "Enter a callsign for RBN lookup.";
+    return;
+  }
+  els.rbnCall.value = call;
+  const pageUrl = rbnUrl(call, seconds);
+  if (openFallback) {
+    window.open(pageUrl, "_blank", "noopener");
+    return;
+  }
+  const params = new URLSearchParams({
+    h: rbnVersionHash,
+    cdx: call,
+    ma: String(seconds),
+    m: "1",
+    s: "0",
+    r: "100"
+  });
+  els.rbnRunBtn.disabled = true;
+  els.rbnMeta.textContent = `Checking ${call}, last ${seconds >= 86400 ? "24 hours" : `${Math.round(seconds / 60)} min`}...`;
+  try {
+    const response = await fetch(`${rbnEndpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`RBN returned HTTP ${response.status}`);
+    const payload = await response.json();
+    const spots = parseRbnSpots(payload, call);
+    renderRbnMap(spots, call);
+    renderRbnTable(spots);
+    const bands = [...new Set(spots.map((spot) => `${spot.bandMeters}m`))].join(", ");
+    els.rbnMeta.textContent = `${spots.length.toLocaleString()} geolocated CW RBN spots for ${call}`;
+    els.rbnSummary.innerHTML = spots.length
+      ? `Bands heard: ${bands || "none"}. Auto-refreshes every 2 minutes while this page is open.`
+      : `No geolocated CW RBN spots found. <a href="${pageUrl}" target="_blank" rel="noopener">Open RBN search</a>`;
+  } catch (error) {
+    renderRbnMap([], call);
+    els.rbnTable.innerHTML = "";
+    els.rbnMeta.textContent = "RBN direct lookup blocked";
+    els.rbnSummary.innerHTML = `${error.message}. Browser CORS may block direct RBN JSON in the HTML version. <a href="${pageUrl}" target="_blank" rel="noopener">Open this callsign on Reverse Beacon Network</a>.`;
+  } finally {
+    els.rbnRunBtn.disabled = false;
+    clearInterval(rbnTimer);
+    rbnTimer = setInterval(() => runRbnMonitor(false), 120000);
+  }
+}
+
 function scaledSnr(snr, powerDbm) {
-  return Number(snr) + (50 - Number(powerDbm));
+  const cleanSnr = Number(snr);
+  const cleanPower = Number(powerDbm);
+  if (!Number.isFinite(cleanSnr) || !Number.isFinite(cleanPower)) return NaN;
+  return cleanSnr + (50 - cleanPower);
+}
+
+function powerScaleNote(powerDbm) {
+  const cleanPower = Number(powerDbm);
+  if (!Number.isFinite(cleanPower)) return "reported power unavailable";
+  if (cleanPower === 50) return "reported at 100W";
+  if (cleanPower < 50) return `scaled up from ${cleanPower} dBm to 50 dBm`;
+  return `scaled down from ${cleanPower} dBm to 50 dBm`;
 }
 
 function modeText(snr100w) {
@@ -480,6 +661,7 @@ function scaledText(snr, powerDbm) {
   const estimate = scaledSnr(snr, powerDbm);
   return `
     <span class="estimate">100W est ${estimate >= 0 ? "+" : ""}${estimate.toFixed(0)} dB</span>
+    <span class="estimate power-note">${powerScaleNote(powerDbm)}</span>
     ${modeText(estimate).map((mode) => `<span class="mode-chip ${mode.ok ? "ok" : "no"}">${mode.name}</span>`).join("")}
   `;
 }
@@ -796,15 +978,33 @@ function renderHeatmap(rows) {
 }
 
 function renderSlots(rows) {
-  const slots = [...rows].sort((a, b) => Number(b.spots) - Number(a.spots)).slice(0, 8);
+  const byBand = new Map();
+  rows.forEach((row) => {
+    const band = Number(row.band);
+    const current = byBand.get(band) || { band, rows: [] };
+    current.rows.push(row);
+    byBand.set(band, current);
+  });
+  const slots = bands
+    .map((band) => byBand.get(band))
+    .filter(Boolean)
+    .map((data) => {
+      const allBest = [...data.rows].sort((a, b) => Number(b.spots) - Number(a.spots) || Number(b.best_snr) - Number(a.best_snr))[0];
+      const dxBest = [...data.rows]
+        .filter((row) => Number(row.dx_spots) > 0)
+        .sort((a, b) => Number(b.dx_spots) - Number(a.dx_spots) || Number(b.dx_best_snr) - Number(a.dx_best_snr))[0];
+      return { band: data.band, allBest, dxBest };
+    });
   els.slotList.innerHTML = slots.length ? slots.map((slot) => `
     <li>
       <div class="slot-main">
-        <span>${bandLabel(slot.band)} at ${String(slot.hour).padStart(2, "0")}:00 UTC</span>
-        <span>${Number(slot.spots).toLocaleString()}</span>
+        <span>${bandLabel(slot.band)}</span>
+        <span>${Number(slot.allBest.spots).toLocaleString()}</span>
       </div>
-      <div class="slot-sub">Avg SNR ${slot.avg_snr} dB, best ${slot.best_snr} dB, ${slot.tx_count} TX / ${slot.rx_count} RX stations</div>
-      <div class="mode-hint">${scaledText(slot.best_snr, slot.best_power)}</div>
+      <div class="slot-sub">All stations: ${String(slot.allBest.hour).padStart(2, "0")}:00 UTC, avg SNR ${slot.allBest.avg_snr} dB, best ${slot.allBest.best_snr} dB, ${slot.allBest.tx_count} TX / ${slot.allBest.rx_count} RX stations</div>
+      <div class="mode-hint">${scaledText(slot.allBest.best_snr, slot.allBest.best_power)}</div>
+      <div class="slot-sub">DX over 3,000 km: ${slot.dxBest ? `${String(slot.dxBest.hour).padStart(2, "0")}:00 UTC, ${Number(slot.dxBest.dx_spots).toLocaleString()} spots, best ${slot.dxBest.dx_best_snr} dB` : "no DX spots in this history window"}</div>
+      ${slot.dxBest ? `<div class="mode-hint">${scaledText(slot.dxBest.dx_best_snr, slot.dxBest.dx_best_power)}</div>` : ""}
     </li>
   `).join("") : `<li>No ranked slots yet.</li>`;
 }
@@ -864,20 +1064,6 @@ function renderBandChances(rows) {
       <div class="mode-hint">${scaledText(chance.best.best_snr, chance.best.best_power)}</div>
     </li>
   `).join("") : `<li>No per-band openings found.</li>`;
-}
-
-function renderLatest(rows) {
-  els.latestMeta.textContent = rows.length ? `${rows.length} most recent` : "";
-  els.latest.innerHTML = rows.length ? rows.map((spot) => `
-    <article class="spot">
-      <div class="spot-main">
-        <span>${bandLabel(spot.band)} ${spot.tx_sign} → ${spot.rx_sign}</span>
-        <span>${spot.snr} dB</span>
-      </div>
-      <div class="spot-sub">${spot.time.replace(" ", "T").slice(0, 16)} UTC · ${spot.tx_loc} to ${spot.rx_loc} · ${spot.distance} km · ${spot.power} dBm</div>
-      <div class="mode-hint">${scaledText(spot.snr, spot.power)}</div>
-    </article>
-  `).join("") : `<p class="spot-sub">No recent spots for this path.</p>`;
 }
 
 async function runLiveMap() {
@@ -966,28 +1152,23 @@ async function run() {
         uniqExact(rx_sign) AS rx_count,
         round(avg(snr), 1) AS avg_snr,
         max(snr) AS best_snr,
-        argMax(power, snr) AS best_power
-      FROM wspr.rx
-      WHERE ${since} AND band IN (${bandSqlList}) AND ${where}
-      GROUP BY band, hour
-      ORDER BY band, hour`;
-
-    const latestSql = `
-      SELECT time, band, tx_sign, tx_loc, rx_sign, rx_loc, distance, snr, power
+        argMax(power, snr) AS best_power,
+        countIf(distance >= 3000) AS dx_spots,
+        maxIf(snr, distance >= 3000) AS dx_best_snr,
+        argMaxIf(power, snr, distance >= 3000) AS dx_best_power
       FROM wspr.rx
       WHERE ${since} AND band IN (${bandSqlList}) AND ${where}
         AND tx_loc != ''
         AND rx_loc != ''
         AND distance > 0
-      ORDER BY time DESC
-      LIMIT 10`;
+      GROUP BY band, hour
+      ORDER BY band, hour`;
 
-    const [summary, latest] = await Promise.all([runQuery(summarySql), runQuery(latestSql)]);
+    const summary = await runQuery(summarySql);
     renderPathMap(a, b);
     renderHeatmap(summary);
     renderSlots(summary);
     renderBandChances(summary);
-    renderLatest(latest);
     runLiveMap();
     els.queryMeta.textContent = `${a.name} ↔ ${b.name}, ${days} days`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} spots across ${summary.length} band/hour slots.`);
@@ -1107,6 +1288,14 @@ els.liveMinDistance.addEventListener("change", runLiveMap);
 els.liveMinDistance.addEventListener("keydown", (event) => {
   if (event.key === "Enter") runLiveMap();
 });
+els.rbnRunBtn.addEventListener("click", () => runRbnMonitor(false));
+els.rbnCall.addEventListener("input", () => {
+  els.rbnCall.value = els.rbnCall.value.toUpperCase();
+});
+els.rbnCall.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") runRbnMonitor(false);
+});
+els.rbnWindow.addEventListener("change", () => runRbnMonitor(false));
 els.refreshBtn.addEventListener("click", () => {
   loadSpaceWeather();
   run();
@@ -1120,5 +1309,6 @@ fillBox("a", knownRegions.scotland);
 fillBox("b", knownRegions["new zealand"]);
 updateModeUi("a", false);
 updateModeUi("b", false);
+renderRbnMap([], els.rbnCall.value.trim().toUpperCase() || "CALL");
 loadSpaceWeather();
 run();
