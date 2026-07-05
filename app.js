@@ -250,6 +250,7 @@ const els = {
 let currentQueryContext = null;
 let currentPathMinDistance = 0;
 let suppressMapPreview = false;
+let openBandDetailKey = null;
 const pathSettingsKey = "wsprspydx.pathSettings.v1";
 
 function normaliseName(value) {
@@ -1305,6 +1306,7 @@ function ensureBandDetailPanel() {
 
 function resetBandDetailPanel() {
   const panel = ensureBandDetailPanel();
+  openBandDetailKey = null;
   els.bandDetailTitle.textContent = "Select a band to see matching spots";
   els.bandDetailMeta.textContent = "Click a Best By Band tile for country and 100W spot detail.";
   els.bandCountrySummary.innerHTML = "";
@@ -1571,6 +1573,14 @@ function renderBandSpotDetails(band, startHour, rows, minDistance) {
 
 async function showBandSpotDetails(band, startHour, tile) {
   if (!currentQueryContext) return;
+  const detailKey = `${Number(band)}-${Number(startHour)}`;
+  const panel = ensureBandDetailPanel();
+  if (!panel.hidden && openBandDetailKey === detailKey) {
+    panel.hidden = true;
+    openBandDetailKey = null;
+    return;
+  }
+  openBandDetailKey = detailKey;
   const minDistance = currentPathMinDistance;
   moveBandDetailAfter(tile);
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots loading...`;
