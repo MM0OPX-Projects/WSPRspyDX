@@ -694,9 +694,12 @@ h2 {
 }
 
 .heatmap-wrap {
-  overflow: visible;
-  touch-action: manipulation;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
+  scrollbar-color: rgba(159,185,215,.55) rgba(255,255,255,.06);
 }
 
 .heatmap {
@@ -991,6 +994,7 @@ h2 {
 
   .heatmap {
     font-size: clamp(.48rem, 2.15vw, .66rem);
+    min-width: 760px;
   }
 
   .heatmap th,
@@ -1002,18 +1006,26 @@ h2 {
   .heatmap th:first-child,
   .heatmap td:first-child {
     width: 40px;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    box-shadow: 1px 0 0 rgba(255,255,255,.08);
+  }
+
+  .heatmap th:first-child {
+    z-index: 3;
   }
 
   .heatmap-cell.digits-4 span {
-    font-size: .88em;
+    font-size: .84em;
   }
 
   .heatmap-cell.digits-5 span {
-    font-size: .68em;
+    font-size: .58em;
   }
 
   .heatmap-cell.digits-6 span {
-    font-size: .58em;
+    font-size: .5em;
   }
 
   .suggestions {
