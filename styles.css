@@ -694,9 +694,8 @@ h2 {
 }
 
 .heatmap-wrap {
-  overflow: auto;
-  touch-action: pan-x pan-y pinch-zoom;
-  overscroll-behavior: contain;
+  overflow: visible;
+  touch-action: manipulation;
   padding-bottom: 4px;
 }
 
