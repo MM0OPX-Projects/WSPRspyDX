@@ -769,6 +769,17 @@ h2 {
   border-top: 1px solid rgba(255,255,255,.1);
 }
 
+.slot-list li.band-detail {
+  margin-top: 0;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(4, 12, 24, .34);
+}
+
+.band-detail[hidden] {
+  display: none;
+}
+
 .band-detail h3 {
   margin: 0;
   font-size: 1rem;
