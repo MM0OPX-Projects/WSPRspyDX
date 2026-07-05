@@ -165,8 +165,7 @@ const els = {
   livePower: document.querySelector("#livePower"),
   liveSummary: document.querySelector("#liveSummary"),
   bandChanceList: document.querySelector("#bandChanceList"),
-  bandMinDistance: document.querySelector("#bandMinDistance"),
-  bandApplyBtn: document.querySelector("#bandApplyBtn"),
+  pathMinDistance: document.querySelector("#pathMinDistance"),
   queryMeta: document.querySelector("#queryMeta"),
   rbnCall: document.querySelector("#rbnCall"),
   rbnWindow: document.querySelector("#rbnWindow"),
@@ -1197,20 +1196,6 @@ function summarySqlFor(context, minDistance = 0) {
       ORDER BY band, hour`;
 }
 
-async function refreshBandChances() {
-  if (!currentQueryContext) return;
-  const minDistance = cleanDistanceInput(els.bandMinDistance);
-  els.bandApplyBtn.disabled = true;
-  try {
-    const rows = await runQuery(summarySqlFor(currentQueryContext, minDistance));
-    renderBandChances(rows, minDistance);
-  } catch (error) {
-    els.bandChanceList.innerHTML = `<li>${error.message}</li>`;
-  } finally {
-    els.bandApplyBtn.disabled = false;
-  }
-}
-
 async function run() {
   try {
     await resolveCurrentInputs(false);
@@ -1227,16 +1212,13 @@ async function run() {
 
     currentQueryContext = { a, b, days, where, since };
 
-    const bandMinDistance = cleanDistanceInput(els.bandMinDistance);
-    const [summary, bandSummary] = await Promise.all([
-      runQuery(summarySqlFor(currentQueryContext, 0)),
-      bandMinDistance ? runQuery(summarySqlFor(currentQueryContext, bandMinDistance)) : Promise.resolve(null)
-    ]);
+    const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
+    const summary = await runQuery(summarySqlFor(currentQueryContext, pathMinDistance));
     renderPathMap(a, b);
     renderHeatmap(summary);
-    renderBandChances(bandSummary || summary, bandMinDistance);
+    renderBandChances(summary, pathMinDistance);
     runLiveMap();
-    els.queryMeta.textContent = `${pathLabel}, ${days} days`;
+    els.queryMeta.textContent = `${pathLabel}, ${days} days${pathMinDistance ? `, min ${pathMinDistance.toLocaleString()} km` : ""}`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} spots across ${summary.length} band/hour slots.`);
   } catch (error) {
     setStatus(error.message, true);
@@ -1366,9 +1348,8 @@ document.addEventListener("click", (event) => {
   }
 });
 els.runBtn.addEventListener("click", run);
-els.bandApplyBtn.addEventListener("click", refreshBandChances);
-els.bandMinDistance.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") refreshBandChances();
+els.pathMinDistance.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") run();
 });
 els.liveRefreshBtn.addEventListener("click", runLiveMap);
 els.liveWindow.addEventListener("change", runLiveMap);

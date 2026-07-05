@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=41">
+  <link rel="stylesheet" href="styles.css?v=42">
 </head>
 <body>
   <main class="wrap">
@@ -79,6 +79,10 @@
             <option value="ab">A heard in B</option>
             <option value="ba">B heard in A</option>
           </select>
+        </div>
+        <div class="selectBox">
+          <label for="pathMinDistance">Minimum distance (km)</label>
+          <input id="pathMinDistance" type="number" min="0" max="20040" step="100" value="0" inputmode="numeric" placeholder="0" aria-label="Path minimum distance in kilometres">
         </div>
         <div class="selectBox runBox">
           <label>&nbsp;</label>
@@ -150,12 +154,7 @@
     <section class="card bandCard">
       <div class="section-head">
         <h2>Best By Band</h2>
-        <div class="card-filter">
-          <span>best 2h UTC window</span>
-          <label for="bandMinDistance">Minimum distance (km)</label>
-          <input id="bandMinDistance" type="number" min="0" max="20040" step="100" value="0" inputmode="numeric" placeholder="0" aria-label="Best by band minimum distance in kilometres">
-          <button id="bandApplyBtn" type="button">Apply</button>
-        </div>
+        <span>best 2h UTC window</span>
       </div>
       <ol class="slot-list" id="bandChanceList"></ol>
     </section>
@@ -233,6 +232,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=41"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>

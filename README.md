@@ -5,19 +5,19 @@ WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagatio
 The project is available in two formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
-- **Android APK**: `releases/WSPRSpyDX-v0.25-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.26-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
 
 ## Features
 
 - Queries historical WSPR spots from the public WSPR Live ClickHouse endpoint.
 - Lets you type countries or major regions for each end of the path.
-- Lets you leave Region B blank to check Region A against anywhere, then use minimum distance for DX filtering.
+- Lets you leave Region B blank to check Region A against anywhere, then use the main historical minimum-distance filter for DX filtering.
 - Adds path modes for country/region, CQ zone, ITU zone, and Maidenhead locator searches.
 - Supports multiple target zones or locators, for example `14` to `1,2`.
 - Includes shortcuts for Scotland, New Zealand, USA East Coast, USA West Coast, and other common regions.
 - Supports history windows from recent days up to longer lookbacks.
 - Shows best bands and best UTC operating windows by band.
-- Adds minimum-distance filters for Best By Band, Live Openings, and the CW Reverse Beacon Network monitor.
+- Adds a main historical minimum-distance filter for UTC Windows and Best By Band, with separate distance filters for Live Openings and the CW Reverse Beacon Network monitor.
 - Includes a live openings map with band-coloured paths, hot bands, hot countries, and 100 W mode estimates.
 - Includes a CW Reverse Beacon Network monitor with callsign, time-window, and minimum-distance filtering.
 - Estimates 100 W equivalent signal reports from WSPR SNR and reported transmit power.
@@ -80,7 +80,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.25-debug.apk
+releases/WSPRSpyDX-v0.26-debug.apk
 ```
 
 To install it on Android:
@@ -116,7 +116,7 @@ The current test APK was built locally from this wrapper and the dashboard asset
 |-- world-map.png
 |-- android-apk/
 `-- releases/
-    `-- WSPRSpyDX-v0.25-debug.apk
+    `-- WSPRSpyDX-v0.26-debug.apk
 ```
 
 ## Notes
