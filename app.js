@@ -250,6 +250,7 @@ const els = {
 let currentQueryContext = null;
 let currentPathMinDistance = 0;
 let suppressMapPreview = false;
+const pathSettingsKey = "wsprspydx.pathSettings.v1";
 
 function normaliseName(value) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -1604,6 +1605,7 @@ async function run() {
 
     const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
     currentPathMinDistance = pathMinDistance;
+    savePathSettings();
     const summaryCandidates = await runQuery(summaryCandidateSqlFor(currentQueryContext, pathMinDistance));
     const summary = aggregateSummaryRows(summaryCandidates, currentQueryContext);
     renderPathMap(a, b, summaryCandidates);
@@ -1660,6 +1662,37 @@ function modeHelpText() {
   els.modeNote.textContent = `Path input: A uses ${aText}; B uses ${bText}. Countries autocomplete; zones and locators can be comma separated. Leave Region B blank for Region A to anywhere.`;
 }
 
+function savePathSettings() {
+  try {
+    localStorage.setItem(pathSettingsKey, JSON.stringify({
+      period: els.period.value,
+      aMode: els.aMode.value,
+      aCountry: els.aCountry.value,
+      bMode: els.bMode.value,
+      bCountry: els.bCountry.value,
+      direction: els.direction.value,
+      pathMinDistance: els.pathMinDistance.value
+    }));
+  } catch (error) {}
+}
+
+function restorePathSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(pathSettingsKey) || "null");
+    if (!saved || typeof saved !== "object") return false;
+    if (saved.period) els.period.value = saved.period;
+    if (saved.aMode) els.aMode.value = saved.aMode;
+    if (saved.bMode) els.bMode.value = saved.bMode;
+    if (saved.direction) els.direction.value = saved.direction;
+    if (saved.pathMinDistance !== undefined) els.pathMinDistance.value = saved.pathMinDistance;
+    els.aCountry.value = saved.aCountry || "";
+    els.bCountry.value = saved.bCountry || "";
+    return Boolean(els.aCountry.value.trim());
+  } catch (error) {
+    return false;
+  }
+}
+
 function resolveStructuredInput(prefix, shouldReport = true) {
   const mode = els[`${prefix}Mode`].value;
   const value = els[`${prefix}Country`].value.trim();
@@ -1703,15 +1736,23 @@ function updateModeUi(prefix, resetValue = true) {
   }
 }
 
-els.aMode.addEventListener("change", () => updateModeUi("a"));
-els.bMode.addEventListener("change", () => updateModeUi("b"));
+els.aMode.addEventListener("change", () => {
+  updateModeUi("a");
+  savePathSettings();
+});
+els.bMode.addEventListener("change", () => {
+  updateModeUi("b");
+  savePathSettings();
+});
 els.aCountry.addEventListener("input", () => {
+  savePathSettings();
   if (els.aMode.value === "country") scheduleCountryLookup("a");
   else {
     try { resolveStructuredInput("a", false); } catch (error) {}
   }
 });
 els.bCountry.addEventListener("input", () => {
+  savePathSettings();
   if (isAnywhereTarget("b")) {
     els.bSuggestions.classList.remove("open");
     els.bCountryOptions.innerHTML = "";
@@ -1723,8 +1764,14 @@ els.bCountry.addEventListener("input", () => {
     try { resolveStructuredInput("b", false); } catch (error) {}
   }
 });
-els.aCountry.addEventListener("change", () => resolvePathInput("a"));
-els.bCountry.addEventListener("change", () => resolvePathInput("b"));
+els.aCountry.addEventListener("change", () => {
+  savePathSettings();
+  resolvePathInput("a");
+});
+els.bCountry.addEventListener("change", () => {
+  savePathSettings();
+  resolvePathInput("b");
+});
 els.aSuggestions.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button) chooseSuggestion("a", button.dataset.name);
@@ -1748,6 +1795,9 @@ els.bandChanceList.addEventListener("click", (event) => {
 els.pathMinDistance.addEventListener("keydown", (event) => {
   if (event.key === "Enter") run();
 });
+els.period.addEventListener("change", savePathSettings);
+els.direction.addEventListener("change", savePathSettings);
+els.pathMinDistance.addEventListener("change", savePathSettings);
 els.liveRefreshBtn.addEventListener("click", runLiveMap);
 els.liveWindow.addEventListener("change", runLiveMap);
 els.liveDirection.addEventListener("change", runLiveMap);
@@ -1776,10 +1826,16 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
-fillBox("a", knownRegions.scotland);
-fillBox("b", knownRegions["new zealand"]);
+const hasSavedPathSettings = restorePathSettings();
 updateModeUi("a", false);
 updateModeUi("b", false);
 renderRbnMap([], els.rbnCall.value.trim().toUpperCase() || "CALL");
 loadSpaceWeather();
-run();
+if (hasSavedPathSettings) {
+  run();
+} else {
+  renderPathMap({ name: "Region A", lat: 20, lon: 0, latMin: -90, latMax: 90, lonMin: -180, lonMax: 180, boxes: [] }, null, []);
+  renderHeatmap([]);
+  renderBandChances([]);
+  setStatus("Ready. Enter Region A, optionally Region B, then run a path check.");
+}

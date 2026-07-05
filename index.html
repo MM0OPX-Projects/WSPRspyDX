@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=51">
+  <link rel="stylesheet" href="styles.css?v=52">
 </head>
 <body>
   <main class="wrap">
@@ -50,7 +50,7 @@
         <div class="selectBox">
           <label id="aInputLabel" for="aCountry">Region A</label>
           <div class="combo">
-            <input id="aCountry" autocomplete="off" value="Scotland" aria-label="Region A country or area">
+            <input id="aCountry" autocomplete="off" value="" aria-label="Region A country or area">
             <datalist id="aCountryOptions"></datalist>
             <div class="suggestions" id="aSuggestions" role="listbox"></div>
           </div>
@@ -67,7 +67,7 @@
         <div class="selectBox">
           <label id="bInputLabel" for="bCountry">Region B</label>
           <div class="combo">
-            <input id="bCountry" autocomplete="off" value="New Zealand" placeholder="Leave blank for anywhere" aria-label="Region B country or area">
+            <input id="bCountry" autocomplete="off" value="" placeholder="Leave blank for anywhere" aria-label="Region B country or area">
             <datalist id="bCountryOptions"></datalist>
             <div class="suggestions" id="bSuggestions" role="listbox"></div>
           </div>
@@ -232,6 +232,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=51"></script>
+  <script src="app.js?v=52"></script>
 </body>
 </html>

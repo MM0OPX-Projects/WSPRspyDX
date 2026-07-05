@@ -1,5 +1,5 @@
-const cacheName = "wsprspydx-v51";
-const appFiles = ["./", "./index.html", "./styles.css?v=51", "./app.js?v=51", "./manifest.webmanifest", "./icon.svg", "./world-map.png"];
+const cacheName = "wsprspydx-v52";
+const appFiles = ["./", "./index.html", "./styles.css?v=52", "./app.js?v=52", "./manifest.webmanifest", "./icon.svg", "./world-map.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(cacheName).then((cache) => cache.addAll(appFiles)));
