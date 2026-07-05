@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=54">
+  <link rel="stylesheet" href="styles.css?v=55">
 </head>
 <body>
   <main class="wrap">
@@ -137,6 +137,18 @@
       <div class="heatmap-wrap">
         <table class="heatmap" id="heatmap" aria-label="Band by hour heatmap"></table>
       </div>
+      <div class="band-detail utc-detail" id="bandDetailPanel" hidden>
+        <div class="section-head band-detail-head">
+          <div>
+            <h3 id="bandDetailTitle">Select a UTC window to see matching spots</h3>
+            <span id="bandDetailMeta">Tap a populated UTC window for country and 100W spot detail.</span>
+          </div>
+        </div>
+        <div class="live-countries band-country-summary" id="bandCountrySummary"></div>
+        <div class="rbn-table-wrap">
+          <table class="rbn-table band-spot-table" id="bandSpotTable" aria-label="Selected UTC window spots"></table>
+        </div>
+      </div>
     </section>
 
     <section class="card weatherCard space-weather quiet" id="spaceWeather" aria-label="Space weather">
@@ -149,14 +161,6 @@
         <strong id="spaceWeatherTitle">Checking NOAA Kp...</strong>
         <p id="spaceWeatherBody">Recent geomagnetic activity can make current HF conditions differ from the historical WSPR pattern.</p>
       </div>
-    </section>
-
-    <section class="card bandCard">
-      <div class="section-head">
-        <h2>Best By Band</h2>
-        <span>best 2h UTC window</span>
-      </div>
-      <ol class="slot-list" id="bandChanceList"></ol>
     </section>
 
     <section class="card liveMapCard">
@@ -232,6 +236,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=54"></script>
+  <script src="app.js?v=55"></script>
 </body>
 </html>

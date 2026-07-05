@@ -299,10 +299,6 @@ fieldset {
   grid-column: span 12;
 }
 
-.bandCard {
-  grid-column: span 12;
-}
-
 .latestCard {
   grid-column: span 12;
 }
@@ -698,7 +694,9 @@ h2 {
 }
 
 .heatmap-wrap {
-  overflow-x: visible;
+  overflow: auto;
+  touch-action: pan-x pan-y pinch-zoom;
+  overscroll-behavior: contain;
   padding-bottom: 4px;
 }
 
@@ -728,7 +726,19 @@ h2 {
   font-weight: 900;
 }
 
-.slot-list,
+.heatmap-cell {
+  cursor: pointer;
+}
+
+.heatmap-cell:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.heatmap-cell:active {
+  filter: brightness(1.14);
+}
+
 .latest {
   display: grid;
   gap: 9px;
@@ -737,7 +747,6 @@ h2 {
   list-style: none;
 }
 
-.slot-list li,
 .spot {
   padding: 11px;
   border: 1px solid rgba(255,255,255,.075);
@@ -745,36 +754,10 @@ h2 {
   background: rgba(255,255,255,.055);
 }
 
-.band-detail-btn {
-  display: block;
-  width: 100%;
-  padding: 0;
-  min-height: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.band-detail-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-}
-
 .band-detail {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid rgba(255,255,255,.1);
-}
-
-.slot-list li.band-detail {
-  margin-top: 0;
-  padding: 12px;
-  border: 1px solid rgba(255,255,255,.1);
-  background: rgba(4, 12, 24, .34);
 }
 
 .band-detail[hidden] {
@@ -851,8 +834,7 @@ h2 {
   .mapCard,
   .liveMapCard,
   .rbnCard,
-  .weatherCard,
-  .bandCard {
+  .weatherCard {
     grid-column: span 12;
   }
 

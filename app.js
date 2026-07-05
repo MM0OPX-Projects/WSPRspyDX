@@ -219,7 +219,6 @@ const els = {
   liveCountries: document.querySelector("#liveCountries"),
   livePower: document.querySelector("#livePower"),
   liveSummary: document.querySelector("#liveSummary"),
-  bandChanceList: document.querySelector("#bandChanceList"),
   bandDetailPanel: document.querySelector("#bandDetailPanel"),
   bandDetailTitle: document.querySelector("#bandDetailTitle"),
   bandDetailMeta: document.querySelector("#bandDetailMeta"),
@@ -1225,11 +1224,12 @@ function renderHeatmap(rows) {
       const row = lookup.get(`${band}-${hour}`);
       const count = row ? Number(row.spots) : 0;
       const title = row ? `${bandLabel(band)} ${hour}:00 UTC: ${count} spots, avg SNR ${row.avg_snr} dB` : "";
-      return `<td title="${title}" style="background:${heatColor(count, max)}">${count || ""}</td>`;
+      return `<td class="${count ? "heatmap-cell" : ""}" data-band="${band}" data-hour="${hour}" title="${title}" style="background:${heatColor(count, max)}" tabindex="${count ? "0" : "-1"}">${count || ""}</td>`;
     }).join("");
     return `<tr><th>${String(hour).padStart(2, "0")}</th>${cells}</tr>`;
   }).join("");
   els.heatmap.innerHTML = body ? header + body : `<tr><td>No WSPR spots found for this path.</td></tr>`;
+  resetBandDetailPanel();
 }
 
 function aggregateSummaryRows(rows, context) {
@@ -1280,15 +1280,15 @@ function aggregateSummaryRows(rows, context) {
 
 function ensureBandDetailPanel() {
   if (!els.bandDetailPanel || !document.body.contains(els.bandDetailPanel)) {
-    const panel = document.createElement("li");
-    panel.className = "band-detail band-detail-row";
+    const panel = document.createElement("div");
+    panel.className = "band-detail utc-detail";
     panel.id = "bandDetailPanel";
     panel.hidden = true;
     panel.innerHTML = `
       <div class="section-head band-detail-head">
         <div>
-          <h3 id="bandDetailTitle">Select a band to see matching spots</h3>
-          <span id="bandDetailMeta">Click a Best By Band tile for country and 100W spot detail.</span>
+          <h3 id="bandDetailTitle">Select a UTC window to see matching spots</h3>
+          <span id="bandDetailMeta">Tap a populated UTC window for country and 100W spot detail.</span>
         </div>
       </div>
       <div class="live-countries band-country-summary" id="bandCountrySummary"></div>
@@ -1307,80 +1307,11 @@ function ensureBandDetailPanel() {
 function resetBandDetailPanel() {
   const panel = ensureBandDetailPanel();
   openBandDetailKey = null;
-  els.bandDetailTitle.textContent = "Select a band to see matching spots";
-  els.bandDetailMeta.textContent = "Click a Best By Band tile for country and 100W spot detail.";
+  els.bandDetailTitle.textContent = "Select a UTC window to see matching spots";
+  els.bandDetailMeta.textContent = "Tap a populated UTC window for country and 100W spot detail.";
   els.bandCountrySummary.innerHTML = "";
   els.bandSpotTable.innerHTML = "";
   panel.hidden = true;
-  if (els.bandChanceList && !panel.parentElement) els.bandChanceList.appendChild(panel);
-}
-
-function moveBandDetailAfter(tile) {
-  const panel = ensureBandDetailPanel();
-  if (tile?.parentElement === els.bandChanceList) {
-    tile.insertAdjacentElement("afterend", panel);
-  } else if (!panel.parentElement) {
-    els.bandChanceList.appendChild(panel);
-  }
-  panel.hidden = false;
-  return panel;
-}
-
-function renderBandChances(rows, minDistance = 0) {
-  const byBand = new Map();
-  rows.forEach((row) => {
-    const band = Number(row.band);
-    const current = byBand.get(band) || { rows: [], total: 0 };
-    current.rows.push(row);
-    current.total += Number(row.spots);
-    byBand.set(band, current);
-  });
-
-  const chances = bands.filter((band) => band <= 28 && byBand.has(band)).map((band) => {
-    const data = byBand.get(band);
-    const hourMap = new Map(data.rows.map((row) => [Number(row.hour), row]));
-    let bestWindow = { start: 0, spots: -1, best: data.rows[0], snr100w: -Infinity, mode: 0 };
-    for (let start = 0; start < 24; start += 1) {
-      const windowRows = [0, 1].map((offset) => hourMap.get((start + offset) % 24)).filter(Boolean);
-      const spots = windowRows.reduce((sum, row) => sum + Number(row.spots), 0);
-      const best = [...windowRows].sort((a, b) => Number(b.best_snr) - Number(a.best_snr))[0] || data.rows[0];
-      const snr100w = scaledSnr(best.best_snr, best.best_power);
-      const mode = modeRank(snr100w);
-      if (
-        spots > bestWindow.spots ||
-        (spots === bestWindow.spots && mode > bestWindow.mode) ||
-        (spots === bestWindow.spots && mode === bestWindow.mode && snr100w > bestWindow.snr100w)
-      ) {
-        bestWindow = { start, spots, best, snr100w, mode };
-      }
-    }
-    const end = (bestWindow.start + 2) % 24;
-    const windowText = `${String(bestWindow.start).padStart(2, "0")}:00-${String(end).padStart(2, "0")}:00 UTC`;
-    return {
-      band,
-      best: bestWindow.best,
-      total: data.total,
-      windowSpots: bestWindow.spots,
-      start: bestWindow.start,
-      windowText,
-      snr100w: bestWindow.snr100w,
-      mode: bestWindow.mode
-    };
-  });
-
-  els.bandChanceList.innerHTML = chances.length ? chances.map((chance) => `
-    <li>
-      <button class="band-detail-btn" type="button" data-band="${chance.band}" data-start="${chance.start}" aria-label="Show ${bandLabel(chance.band)} spots for ${chance.windowText}">
-        <div class="slot-main">
-          <span>${bandLabel(chance.band)} best chance</span>
-          <span>${chance.windowText}</span>
-        </div>
-        <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 2h window, ${chance.total.toLocaleString()} total${minDistance ? ` beyond ${minDistance.toLocaleString()} km` : ""}, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
-        <div class="mode-hint">${scaledText(chance.best.best_snr, chance.best.best_power)}</div>
-      </button>
-    </li>
-  `).join("") : `<li>No per-band openings found.</li>`;
-  resetBandDetailPanel();
 }
 
 async function runLiveMap() {
@@ -1480,8 +1411,9 @@ function summaryCandidateSqlFor(context, minDistance = 0) {
       LIMIT 80000`;
 }
 
-function bandSpotSqlFor(context, band, startHour, minDistance = 0) {
-  const nextHour = (Number(startHour) + 1) % 24;
+function bandSpotSqlFor(context, band, startHour, minDistance = 0, durationHours = 1) {
+  const hours = Array.from({ length: Math.max(1, Number(durationHours) || 1) }, (_, index) => (Number(startHour) + index) % 24);
+  const hourWhere = hours.length === 1 ? `= ${hours[0]}` : `IN (${hours.join(", ")})`;
   return `
       SELECT
         time,
@@ -1502,7 +1434,7 @@ function bandSpotSqlFor(context, band, startHour, minDistance = 0) {
       WHERE ${context.since}
         AND ${context.where}
         AND band = ${Number(band)}
-        AND toHour(time) IN (${Number(startHour)}, ${nextHour})
+        AND toHour(time) ${hourWhere}
         AND tx_loc != ''
         AND rx_loc != ''
         ${validSpotCoordsSql}
@@ -1528,11 +1460,11 @@ function formatSpotTime(value) {
   return date.toISOString().slice(0, 16).replace("T", " ");
 }
 
-function renderBandSpotDetails(band, startHour, rows, minDistance) {
-  const endHour = (Number(startHour) + 2) % 24;
+function renderBandSpotDetails(band, startHour, rows, minDistance, durationHours = 1) {
+  const endHour = (Number(startHour) + Number(durationHours)) % 24;
   const windowText = `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:00 UTC`;
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots, ${windowText}`;
-  els.bandDetailMeta.textContent = `${rows.length.toLocaleString()} sample spots from the selected best window${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. Sorted by longest distance first.`;
+  els.bandDetailMeta.textContent = `${rows.length.toLocaleString()} sample spots from the selected UTC window${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. Sorted by longest distance first.`;
   const countries = [...rows.reduce((map, row) => {
     const country = remoteCountryForSpot(row, currentQueryContext);
     const snr100w = scaledSnr(row.snr, row.power);
@@ -1571,7 +1503,7 @@ function renderBandSpotDetails(band, startHour, rows, minDistance) {
   ` : "";
 }
 
-async function showBandSpotDetails(band, startHour, tile) {
+async function showUtcWindowDetails(band, startHour) {
   if (!currentQueryContext) return;
   const detailKey = `${Number(band)}-${Number(startHour)}`;
   const panel = ensureBandDetailPanel();
@@ -1582,15 +1514,15 @@ async function showBandSpotDetails(band, startHour, tile) {
   }
   openBandDetailKey = detailKey;
   const minDistance = currentPathMinDistance;
-  moveBandDetailAfter(tile);
+  panel.hidden = false;
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots loading...`;
-  els.bandDetailMeta.textContent = "Querying matching WSPR spots for the selected 2-hour window.";
+  els.bandDetailMeta.textContent = "Querying matching WSPR spots for the selected UTC window.";
   els.bandCountrySummary.innerHTML = "";
   els.bandSpotTable.innerHTML = "";
   try {
-    const rows = await runQuery(bandSpotSqlFor(currentQueryContext, band, startHour, minDistance));
+    const rows = await runQuery(bandSpotSqlFor(currentQueryContext, band, startHour, minDistance, 1));
     const cleanRows = rows.map((row) => validatedPathSpot(row, currentQueryContext)).filter(Boolean).slice(0, 100);
-    renderBandSpotDetails(band, startHour, cleanRows, minDistance);
+    renderBandSpotDetails(band, startHour, cleanRows, minDistance, 1);
   } catch (error) {
     els.bandDetailTitle.textContent = `${bandLabel(band)} spot detail unavailable`;
     els.bandDetailMeta.textContent = error.message;
@@ -1620,7 +1552,6 @@ async function run() {
     const summary = aggregateSummaryRows(summaryCandidates, currentQueryContext);
     renderPathMap(a, b, summaryCandidates);
     renderHeatmap(summary);
-    renderBandChances(summary, pathMinDistance);
     runLiveMap();
     els.queryMeta.textContent = `${pathLabel}, ${days} days${pathMinDistance ? `, min ${pathMinDistance.toLocaleString()} km` : ""}`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} spots across ${summary.length} band/hour slots.`);
@@ -1797,10 +1728,17 @@ document.addEventListener("click", (event) => {
   }
 });
 els.runBtn.addEventListener("click", run);
-els.bandChanceList.addEventListener("click", (event) => {
-  const button = event.target.closest(".band-detail-btn");
-  if (!button) return;
-  showBandSpotDetails(Number(button.dataset.band), Number(button.dataset.start), button.closest("li"));
+els.heatmap.addEventListener("click", (event) => {
+  const cell = event.target.closest(".heatmap-cell");
+  if (!cell) return;
+  showUtcWindowDetails(Number(cell.dataset.band), Number(cell.dataset.hour));
+});
+els.heatmap.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const cell = event.target.closest(".heatmap-cell");
+  if (!cell) return;
+  event.preventDefault();
+  showUtcWindowDetails(Number(cell.dataset.band), Number(cell.dataset.hour));
 });
 els.pathMinDistance.addEventListener("keydown", (event) => {
   if (event.key === "Enter") run();
@@ -1846,6 +1784,5 @@ if (hasSavedPathSettings) {
 } else {
   renderPathMap({ name: "Region A", lat: 20, lon: 0, latMin: -90, latMax: 90, lonMin: -180, lonMax: 180, boxes: [] }, null, []);
   renderHeatmap([]);
-  renderBandChances([]);
   setStatus("Ready. Enter Region A, optionally Region B, then run a path check.");
 }
