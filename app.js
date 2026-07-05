@@ -1385,7 +1385,7 @@ async function runLiveMap() {
   }
 }
 
-function summaryCandidateSqlFor(context, minDistance = 0) {
+function summaryCandidateSqlFor(context, minDistance = 0, sinceOverride = context.since) {
   return `
       SELECT
         time,
@@ -1401,14 +1401,35 @@ function summaryCandidateSqlFor(context, minDistance = 0) {
         snr,
         power
       FROM wspr.rx
-      WHERE ${context.since} AND band IN (${bandSqlList}) AND ${context.where}
+      WHERE ${sinceOverride} AND band IN (${bandSqlList}) AND ${context.where}
         AND tx_loc != ''
         AND rx_loc != ''
         ${validSpotCoordsSql}
         AND ${spotDistanceKmExpr} > 0
         AND ${spotDistanceKmExpr} >= ${minDistance}
-      ORDER BY distance DESC, time DESC
+      ORDER BY time DESC
       LIMIT 80000`;
+}
+
+function summaryTimeWindows(days) {
+  const totalDays = Math.max(1, Number(days) || 1);
+  const chunkDays = totalDays <= 10 ? 1 : totalDays <= 30 ? 2 : 5;
+  const windows = [];
+  for (let start = 0; start < totalDays; start += chunkDays) {
+    const end = Math.min(totalDays, start + chunkDays);
+    windows.push(`time >= now() - INTERVAL ${end} DAY AND time < now() - INTERVAL ${start} DAY`);
+  }
+  return windows;
+}
+
+async function runSummaryCandidateQueries(context, minDistance = 0) {
+  const windows = summaryTimeWindows(context.days);
+  const chunks = [];
+  for (const windowWhere of windows) {
+    const rows = await runQuery(summaryCandidateSqlFor(context, minDistance, windowWhere));
+    chunks.push(...rows);
+  }
+  return chunks;
 }
 
 function bandSpotSqlFor(context, band, startHour, minDistance = 0, durationHours = 1) {
@@ -1548,7 +1569,7 @@ async function run() {
     const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
     currentPathMinDistance = pathMinDistance;
     savePathSettings();
-    const summaryCandidates = await runQuery(summaryCandidateSqlFor(currentQueryContext, pathMinDistance));
+    const summaryCandidates = await runSummaryCandidateQueries(currentQueryContext, pathMinDistance);
     const summary = aggregateSummaryRows(summaryCandidates, currentQueryContext);
     renderPathMap(a, b, summaryCandidates);
     renderHeatmap(summary);
