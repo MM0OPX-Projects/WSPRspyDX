@@ -744,6 +744,40 @@ h2 {
   background: rgba(255,255,255,.055);
 }
 
+.band-detail-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.band-detail-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.band-detail {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+
+.band-detail h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.band-country-summary {
+  margin: 10px 0 4px;
+}
+
 .slot-main,
 .spot-main {
   display: flex;

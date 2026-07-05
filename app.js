@@ -165,6 +165,10 @@ const els = {
   livePower: document.querySelector("#livePower"),
   liveSummary: document.querySelector("#liveSummary"),
   bandChanceList: document.querySelector("#bandChanceList"),
+  bandDetailTitle: document.querySelector("#bandDetailTitle"),
+  bandDetailMeta: document.querySelector("#bandDetailMeta"),
+  bandCountrySummary: document.querySelector("#bandCountrySummary"),
+  bandSpotTable: document.querySelector("#bandSpotTable"),
   pathMinDistance: document.querySelector("#pathMinDistance"),
   queryMeta: document.querySelector("#queryMeta"),
   rbnCall: document.querySelector("#rbnCall"),
@@ -188,6 +192,7 @@ const els = {
 };
 
 let currentQueryContext = null;
+let currentPathMinDistance = 0;
 
 function normaliseName(value) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -204,6 +209,16 @@ function bandColor(band) {
 function spotCountText(count) {
   const clean = Number(count) || 0;
   return `${clean.toLocaleString()} ${clean === 1 ? "spot" : "spots"}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
 }
 
 function normaliseCallsign(callsign) {
@@ -251,6 +266,19 @@ function fillBox(prefix, box) {
   els[`${prefix}LonMin`].value = bounds.lonMin;
   els[`${prefix}LonMax`].value = bounds.lonMax;
   updateMapFromBoxes();
+}
+
+function pointInRegion(lat, lon, box) {
+  const pointLat = Number(lat);
+  const pointLon = Number(lon);
+  if (!Number.isFinite(pointLat) || !Number.isFinite(pointLon) || !box) return false;
+  const boxes = box.boxes?.length ? box.boxes : [box];
+  return boxes.some((part) =>
+    pointLat >= Number(part.latMin) &&
+    pointLat <= Number(part.latMax) &&
+    pointLon >= Number(part.lonMin) &&
+    pointLon <= Number(part.lonMax)
+  );
 }
 
 function isAnywhereTarget(prefix = "b") {
@@ -1093,6 +1121,7 @@ function renderBandChances(rows, minDistance = 0) {
       best: bestWindow.best,
       total: data.total,
       windowSpots: bestWindow.spots,
+      start: bestWindow.start,
       windowText,
       snr100w: bestWindow.snr100w,
       mode: bestWindow.mode
@@ -1101,12 +1130,14 @@ function renderBandChances(rows, minDistance = 0) {
 
   els.bandChanceList.innerHTML = chances.length ? chances.map((chance) => `
     <li>
-      <div class="slot-main">
-        <span>${bandLabel(chance.band)} best chance</span>
-        <span>${chance.windowText}</span>
-      </div>
-      <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 2h window, ${chance.total.toLocaleString()} total${minDistance ? ` beyond ${minDistance.toLocaleString()} km` : ""}, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
-      <div class="mode-hint">${scaledText(chance.best.best_snr, chance.best.best_power)}</div>
+      <button class="band-detail-btn" type="button" data-band="${chance.band}" data-start="${chance.start}" aria-label="Show ${bandLabel(chance.band)} spots for ${chance.windowText}">
+        <div class="slot-main">
+          <span>${bandLabel(chance.band)} best chance</span>
+          <span>${chance.windowText}</span>
+        </div>
+        <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 2h window, ${chance.total.toLocaleString()} total${minDistance ? ` beyond ${minDistance.toLocaleString()} km` : ""}, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
+        <div class="mode-hint">${scaledText(chance.best.best_snr, chance.best.best_power)}</div>
+      </button>
     </li>
   `).join("") : `<li>No per-band openings found.</li>`;
 }
@@ -1196,6 +1227,110 @@ function summarySqlFor(context, minDistance = 0) {
       ORDER BY band, hour`;
 }
 
+function bandSpotSqlFor(context, band, startHour, minDistance = 0) {
+  const nextHour = (Number(startHour) + 1) % 24;
+  return `
+      SELECT
+        time,
+        band,
+        tx_sign,
+        rx_sign,
+        tx_lat,
+        tx_lon,
+        rx_lat,
+        rx_lon,
+        distance,
+        snr,
+        power,
+        frequency
+      FROM wspr.rx
+      WHERE ${context.since}
+        AND ${context.where}
+        AND band = ${Number(band)}
+        AND toHour(time) IN (${Number(startHour)}, ${nextHour})
+        AND tx_loc != ''
+        AND rx_loc != ''
+        AND distance > 0
+        AND distance >= ${minDistance}
+      ORDER BY (snr + (50 - power)) DESC, time DESC
+      LIMIT 100`;
+}
+
+function remoteCountryForSpot(row, context) {
+  if (!context?.b) {
+    const txInA = pointInRegion(row.tx_lat, row.tx_lon, context.a);
+    const rxInA = pointInRegion(row.rx_lat, row.rx_lon, context.a);
+    if (txInA && !rxInA) return callsignCountry(row.rx_sign);
+    if (rxInA && !txInA) return callsignCountry(row.tx_sign);
+  }
+  return `${callsignCountry(row.tx_sign)} to ${callsignCountry(row.rx_sign)}`;
+}
+
+function formatSpotTime(value) {
+  const date = new Date(`${String(value).replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return escapeHtml(value);
+  return date.toISOString().slice(0, 16).replace("T", " ");
+}
+
+function renderBandSpotDetails(band, startHour, rows, minDistance) {
+  const endHour = (Number(startHour) + 2) % 24;
+  const windowText = `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:00 UTC`;
+  els.bandDetailTitle.textContent = `${bandLabel(band)} spots, ${windowText}`;
+  els.bandDetailMeta.textContent = `${rows.length.toLocaleString()} sample spots from the selected best window${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. Sorted by strongest 100W estimate.`;
+  const countries = [...rows.reduce((map, row) => {
+    const country = remoteCountryForSpot(row, currentQueryContext);
+    const snr100w = scaledSnr(row.snr, row.power);
+    const current = map.get(country) || { country, spots: 0, best: -Infinity, mode: 0 };
+    current.spots += 1;
+    current.best = Math.max(current.best, snr100w);
+    current.mode = Math.max(current.mode, modeRank(snr100w));
+    map.set(country, current);
+    return map;
+  }, new Map()).values()].sort((a, b) => b.spots - a.spots || b.best - a.best).slice(0, 10);
+  els.bandCountrySummary.innerHTML = countries.length ? countries.map((item) => `
+    <span class="live-country-chip">
+      <b>${escapeHtml(item.country)}</b>
+      <span>${spotCountText(item.spots)} · ${compactModeLabel(item.mode)} · best ${item.best >= 0 ? "+" : ""}${item.best.toFixed(0)} dB</span>
+    </span>
+  `).join("") : `<span class="live-band-empty">No country summary for this window.</span>`;
+  els.bandSpotTable.innerHTML = rows.length ? `
+    <tr><th>UTC</th><th>Band</th><th>TX</th><th>RX</th><th>Countries</th><th>Distance</th><th>SNR</th><th>Power</th><th>100W est</th><th>Mode</th></tr>
+    ${rows.map((row) => {
+      const snr100w = scaledSnr(row.snr, row.power);
+      return `
+        <tr>
+          <td>${formatSpotTime(row.time)}</td>
+          <td>${bandLabel(row.band)}</td>
+          <td>${escapeHtml(row.tx_sign)}</td>
+          <td>${escapeHtml(row.rx_sign)}</td>
+          <td>${escapeHtml(callsignCountry(row.tx_sign))} -&gt; ${escapeHtml(callsignCountry(row.rx_sign))}</td>
+          <td>${Math.round(Number(row.distance)).toLocaleString()} km</td>
+          <td>${Number(row.snr).toFixed(0)} dB</td>
+          <td>${Number(row.power).toFixed(0)} dBm</td>
+          <td>${snr100w >= 0 ? "+" : ""}${snr100w.toFixed(0)} dB</td>
+          <td>${compactModeLabel(modeRank(snr100w))}</td>
+        </tr>
+      `;
+    }).join("")}
+  ` : "";
+}
+
+async function showBandSpotDetails(band, startHour) {
+  if (!currentQueryContext) return;
+  const minDistance = currentPathMinDistance;
+  els.bandDetailTitle.textContent = `${bandLabel(band)} spots loading...`;
+  els.bandDetailMeta.textContent = "Querying matching WSPR spots for the selected 2-hour window.";
+  els.bandCountrySummary.innerHTML = "";
+  els.bandSpotTable.innerHTML = "";
+  try {
+    const rows = await runQuery(bandSpotSqlFor(currentQueryContext, band, startHour, minDistance));
+    renderBandSpotDetails(band, startHour, rows, minDistance);
+  } catch (error) {
+    els.bandDetailTitle.textContent = `${bandLabel(band)} spot detail unavailable`;
+    els.bandDetailMeta.textContent = error.message;
+  }
+}
+
 async function run() {
   try {
     await resolveCurrentInputs(false);
@@ -1213,6 +1348,11 @@ async function run() {
     currentQueryContext = { a, b, days, where, since };
 
     const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
+    currentPathMinDistance = pathMinDistance;
+    els.bandDetailTitle.textContent = "Select a band to see matching spots";
+    els.bandDetailMeta.textContent = "Click a Best By Band tile for country and 100W spot detail.";
+    els.bandCountrySummary.innerHTML = "";
+    els.bandSpotTable.innerHTML = "";
     const summary = await runQuery(summarySqlFor(currentQueryContext, pathMinDistance));
     renderPathMap(a, b);
     renderHeatmap(summary);
@@ -1348,6 +1488,11 @@ document.addEventListener("click", (event) => {
   }
 });
 els.runBtn.addEventListener("click", run);
+els.bandChanceList.addEventListener("click", (event) => {
+  const button = event.target.closest(".band-detail-btn");
+  if (!button) return;
+  showBandSpotDetails(Number(button.dataset.band), Number(button.dataset.start));
+});
 els.pathMinDistance.addEventListener("keydown", (event) => {
   if (event.key === "Enter") run();
 });
