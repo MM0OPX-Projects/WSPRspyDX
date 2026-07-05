@@ -329,6 +329,28 @@ h2 {
   text-align: right;
 }
 
+.card-filter {
+  display: grid;
+  grid-template-columns: auto auto minmax(92px, 130px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.card-filter label {
+  color: #bad4ef;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.card-filter input,
+.card-filter button {
+  min-height: 34px;
+  border-radius: 10px;
+  font-size: .78rem;
+}
+
 .live-head {
   align-items: start;
 }
@@ -362,7 +384,7 @@ h2 {
 }
 
 .rbn-controls {
-  grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) minmax(110px, 140px);
+  grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) auto minmax(96px, 140px) minmax(110px, 140px);
 }
 
 .live-bands,
@@ -817,6 +839,17 @@ h2 {
 
   .rbn-controls {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .card-filter {
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .card-filter span,
+  .card-filter label {
+    display: none;
   }
 
 }

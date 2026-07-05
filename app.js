@@ -166,9 +166,14 @@ const els = {
   liveSummary: document.querySelector("#liveSummary"),
   slotList: document.querySelector("#slotList"),
   bandChanceList: document.querySelector("#bandChanceList"),
+  bandMinDistance: document.querySelector("#bandMinDistance"),
+  bandApplyBtn: document.querySelector("#bandApplyBtn"),
+  slotMinDistance: document.querySelector("#slotMinDistance"),
+  slotApplyBtn: document.querySelector("#slotApplyBtn"),
   queryMeta: document.querySelector("#queryMeta"),
   rbnCall: document.querySelector("#rbnCall"),
   rbnWindow: document.querySelector("#rbnWindow"),
+  rbnMinDistance: document.querySelector("#rbnMinDistance"),
   rbnRunBtn: document.querySelector("#rbnRunBtn"),
   rbnMeta: document.querySelector("#rbnMeta"),
   rbnMap: document.querySelector("#rbnMap"),
@@ -185,6 +190,8 @@ const els = {
   bLonMin: document.querySelector("#bLonMin"),
   bLonMax: document.querySelector("#bLonMax")
 };
+
+let currentQueryContext = null;
 
 function normaliseName(value) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -301,6 +308,16 @@ function mapProject(point) {
   };
 }
 
+function greatCircleKm(latA, lonA, latB, lonB) {
+  const toRad = (value) => Number(value) * Math.PI / 180;
+  const aLat = toRad(latA);
+  const bLat = toRad(latB);
+  const dLat = toRad(Number(latB) - Number(latA));
+  const dLon = toRad(Number(lonB) - Number(lonA));
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(aLat) * Math.cos(bLat) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
 function renderPathMap(a, b) {
   const aCenter = boxCenter(a);
   const bCenter = boxCenter(b);
@@ -333,6 +350,20 @@ function liveMinDistanceKm() {
   const value = Math.round(Number(els.liveMinDistance.value) || 0);
   const cleanValue = Math.max(0, Math.min(20040, value));
   els.liveMinDistance.value = String(cleanValue);
+  return cleanValue;
+}
+
+function rbnMinDistanceKm() {
+  const value = Math.round(Number(els.rbnMinDistance.value) || 0);
+  const cleanValue = Math.max(0, Math.min(20040, value));
+  els.rbnMinDistance.value = String(cleanValue);
+  return cleanValue;
+}
+
+function cleanDistanceInput(input) {
+  const value = Math.round(Number(input.value) || 0);
+  const cleanValue = Math.max(0, Math.min(20040, value));
+  input.value = String(cleanValue);
   return cleanValue;
 }
 
@@ -470,7 +501,7 @@ function rbnUrl(call, seconds) {
   return `${rbnPageEndpoint}?${params.toString()}`;
 }
 
-function parseRbnSpots(payload, call) {
+function parseRbnSpots(payload, call, minDistance = 0) {
   const callInfo = payload.call_info || {};
   return Object.entries(payload.spots || {}).map(([id, row]) => {
     const [de, freq, dx, db, wpm, time, diff, band, type, mode, epoch] = row;
@@ -498,11 +529,16 @@ function parseRbnSpots(payload, call) {
     };
   }).filter((spot) => {
     const cleanDx = String(spot.dx || "").toUpperCase();
+    const distance = Number.isFinite(spot.deLat) && Number.isFinite(spot.deLon) && Number.isFinite(spot.dxLat) && Number.isFinite(spot.dxLon)
+      ? greatCircleKm(spot.deLat, spot.deLon, spot.dxLat, spot.dxLon)
+      : NaN;
+    spot.distance = distance;
     return cleanDx === call &&
       Number.isFinite(spot.deLat) &&
       Number.isFinite(spot.deLon) &&
       Number.isFinite(spot.dxLat) &&
-      Number.isFinite(spot.dxLon);
+      Number.isFinite(spot.dxLon) &&
+      distance >= minDistance;
   }).sort((a, b) => b.epoch - a.epoch);
 }
 
@@ -546,13 +582,14 @@ function renderRbnMap(spots, call) {
 
 function renderRbnTable(spots) {
   els.rbnTable.innerHTML = spots.length ? `
-    <tr><th>UTC</th><th>Band</th><th>Spotter</th><th>Country</th><th>SNR</th><th>Speed</th><th>Freq</th></tr>
+    <tr><th>UTC</th><th>Band</th><th>Spotter</th><th>Country</th><th>Distance</th><th>SNR</th><th>Speed</th><th>Freq</th></tr>
     ${spots.slice(0, 30).map((spot) => `
       <tr>
         <td>${spot.time}</td>
         <td>${spot.bandMeters}m</td>
         <td>${spot.de}</td>
         <td>${spot.deCountry}</td>
+        <td>${Math.round(spot.distance).toLocaleString()} km</td>
         <td>${spot.db} dB</td>
         <td>${spot.wpm || ""} wpm</td>
         <td>${spot.freq}</td>
@@ -566,6 +603,7 @@ let rbnTimer;
 async function runRbnMonitor(openFallback = false) {
   const call = els.rbnCall.value.trim().toUpperCase();
   const seconds = Math.max(900, Number(els.rbnWindow.value) || 900);
+  const minDistance = rbnMinDistanceKm();
   if (!call) {
     els.rbnSummary.textContent = "Enter a callsign for RBN lookup.";
     return;
@@ -585,24 +623,24 @@ async function runRbnMonitor(openFallback = false) {
     r: "100"
   });
   els.rbnRunBtn.disabled = true;
-  els.rbnMeta.textContent = `Checking ${call}, last ${seconds >= 86400 ? "24 hours" : `${Math.round(seconds / 60)} min`}...`;
+  els.rbnMeta.textContent = `Checking ${call}, last ${seconds >= 86400 ? "24 hours" : `${Math.round(seconds / 60)} min`}${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}...`;
   try {
     const response = await fetch(`${rbnEndpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`RBN returned HTTP ${response.status}`);
     const payload = await response.json();
-    const spots = parseRbnSpots(payload, call);
+    const spots = parseRbnSpots(payload, call, minDistance);
     renderRbnMap(spots, call);
     renderRbnTable(spots);
     const bands = [...new Set(spots.map((spot) => `${spot.bandMeters}m`))].join(", ");
-    els.rbnMeta.textContent = `${spots.length.toLocaleString()} geolocated CW RBN spots for ${call}`;
+    els.rbnMeta.textContent = `${spots.length.toLocaleString()} geolocated CW RBN spots for ${call}${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}`;
     els.rbnSummary.innerHTML = spots.length
       ? `Bands heard: ${bands || "none"}. Auto-refreshes every 2 minutes while this page is open.`
-      : `No geolocated CW RBN spots found. <a href="${pageUrl}" target="_blank" rel="noopener">Open RBN search</a>`;
+      : `No geolocated CW RBN spots found${minDistance ? ` beyond ${minDistance.toLocaleString()} km` : ""}. <a href="${pageUrl}" target="_blank" rel="noopener">Open RBN search</a>`;
   } catch (error) {
     renderRbnMap([], call);
     els.rbnTable.innerHTML = "";
     els.rbnMeta.textContent = "RBN direct lookup blocked";
-    els.rbnSummary.innerHTML = `${error.message}. Browser CORS may block direct RBN JSON in the HTML version. <a href="${pageUrl}" target="_blank" rel="noopener">Open this callsign on Reverse Beacon Network</a>.`;
+    els.rbnSummary.innerHTML = `${error.message}. Browser CORS may block direct RBN JSON in the HTML version. <a href="${pageUrl}" target="_blank" rel="noopener">Open this callsign on Reverse Beacon Network</a>${minDistance ? `; apply the ${minDistance.toLocaleString()} km distance filter in WSPRSpyDX when direct RBN data is available` : ""}.`;
   } finally {
     els.rbnRunBtn.disabled = false;
     clearInterval(rbnTimer);
@@ -930,7 +968,7 @@ async function loadSpaceWeather() {
     const now = Date.now();
     const recent = rows
       .map((row) => ({ time: new Date(`${row.time_tag}Z`), kp: Number(row.Kp) }))
-      .filter((row) => !Number.isNaN(row.kp) && now - row.time.getTime() <= 48 * 60 * 60 * 1000)
+      .filter((row) => !Number.isNaN(row.kp) && now - row.time.getTime() <= 24 * 60 * 60 * 1000)
       .sort((a, b) => a.time - b.time);
     if (!recent.length) {
       renderSpaceWeather("caution", "Kp data unavailable", "Could not find recent NOAA Kp values, so treat the WSPR history without a current geomagnetic check.", 45);
@@ -938,7 +976,7 @@ async function loadSpaceWeather() {
     }
     const latest = recent[recent.length - 1];
     const max = recent.reduce((best, row) => row.kp > best.kp ? row : best, recent[0]);
-    const maxText = `Latest Kp ${latest.kp.toFixed(1)}, max ${max.kp.toFixed(1)} in the last 48h.`;
+    const maxText = `Latest Kp ${latest.kp.toFixed(1)}, max ${max.kp.toFixed(1)} in the last 24h.`;
     const stability = Math.round(Math.max(0, Math.min(100, 100 - (max.kp / 9) * 100)));
     if (max.kp >= 5) {
       renderSpaceWeather("storm", "Geomagnetic storm recently", `${maxText} HF paths may be depressed or unusually variable; compare short history against longer history before calling the path dead.`, stability);
@@ -977,7 +1015,7 @@ function renderHeatmap(rows) {
   els.heatmap.innerHTML = body ? header + body : `<tr><td>No WSPR spots found for this path.</td></tr>`;
 }
 
-function renderSlots(rows) {
+function renderSlots(rows, minDistance = 0) {
   const byBand = new Map();
   rows.forEach((row) => {
     const band = Number(row.band);
@@ -990,10 +1028,7 @@ function renderSlots(rows) {
     .filter(Boolean)
     .map((data) => {
       const allBest = [...data.rows].sort((a, b) => Number(b.spots) - Number(a.spots) || Number(b.best_snr) - Number(a.best_snr))[0];
-      const dxBest = [...data.rows]
-        .filter((row) => Number(row.dx_spots) > 0)
-        .sort((a, b) => Number(b.dx_spots) - Number(a.dx_spots) || Number(b.dx_best_snr) - Number(a.dx_best_snr))[0];
-      return { band: data.band, allBest, dxBest };
+      return { band: data.band, allBest };
     });
   els.slotList.innerHTML = slots.length ? slots.map((slot) => `
     <li>
@@ -1001,15 +1036,13 @@ function renderSlots(rows) {
         <span>${bandLabel(slot.band)}</span>
         <span>${Number(slot.allBest.spots).toLocaleString()}</span>
       </div>
-      <div class="slot-sub">All stations: ${String(slot.allBest.hour).padStart(2, "0")}:00 UTC, avg SNR ${slot.allBest.avg_snr} dB, best ${slot.allBest.best_snr} dB, ${slot.allBest.tx_count} TX / ${slot.allBest.rx_count} RX stations</div>
+      <div class="slot-sub">${minDistance ? `Minimum ${minDistance.toLocaleString()} km: ` : "All spots: "}${String(slot.allBest.hour).padStart(2, "0")}:00 UTC, avg SNR ${slot.allBest.avg_snr} dB, best ${slot.allBest.best_snr} dB, ${slot.allBest.tx_count} TX / ${slot.allBest.rx_count} RX stations</div>
       <div class="mode-hint">${scaledText(slot.allBest.best_snr, slot.allBest.best_power)}</div>
-      <div class="slot-sub">DX over 3,000 km: ${slot.dxBest ? `${String(slot.dxBest.hour).padStart(2, "0")}:00 UTC, ${Number(slot.dxBest.dx_spots).toLocaleString()} spots, best ${slot.dxBest.dx_best_snr} dB` : "no DX spots in this history window"}</div>
-      ${slot.dxBest ? `<div class="mode-hint">${scaledText(slot.dxBest.dx_best_snr, slot.dxBest.dx_best_power)}</div>` : ""}
     </li>
   `).join("") : `<li>No ranked slots yet.</li>`;
 }
 
-function renderBandChances(rows) {
+function renderBandChances(rows, minDistance = 0) {
   const byBand = new Map();
   rows.forEach((row) => {
     const band = Number(row.band);
@@ -1060,7 +1093,7 @@ function renderBandChances(rows) {
         <span>${bandLabel(chance.band)} best chance</span>
         <span>${chance.windowText}</span>
       </div>
-      <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 2h window, ${chance.total.toLocaleString()} total, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
+      <div class="slot-sub">${modeSummary(chance.snr100w)}. ${Number(chance.windowSpots).toLocaleString()} spots in this 2h window, ${chance.total.toLocaleString()} total${minDistance ? ` beyond ${minDistance.toLocaleString()} km` : ""}, best 100W estimate ${chance.snr100w >= 0 ? "+" : ""}${chance.snr100w.toFixed(0)} dB</div>
       <div class="mode-hint">${scaledText(chance.best.best_snr, chance.best.best_power)}</div>
     </li>
   `).join("") : `<li>No per-band openings found.</li>`;
@@ -1130,6 +1163,55 @@ async function runLiveMap() {
   }
 }
 
+function summarySqlFor(context, minDistance = 0) {
+  return `
+      SELECT
+        band,
+        toHour(time) AS hour,
+        count() AS spots,
+        uniqExact(tx_sign) AS tx_count,
+        uniqExact(rx_sign) AS rx_count,
+        round(avg(snr), 1) AS avg_snr,
+        max(snr) AS best_snr,
+        argMax(power, snr) AS best_power
+      FROM wspr.rx
+      WHERE ${context.since} AND band IN (${bandSqlList}) AND ${context.where}
+        AND tx_loc != ''
+        AND rx_loc != ''
+        AND distance > 0
+        AND distance >= ${minDistance}
+      GROUP BY band, hour
+      ORDER BY band, hour`;
+}
+
+async function refreshBandChances() {
+  if (!currentQueryContext) return;
+  const minDistance = cleanDistanceInput(els.bandMinDistance);
+  els.bandApplyBtn.disabled = true;
+  try {
+    const rows = await runQuery(summarySqlFor(currentQueryContext, minDistance));
+    renderBandChances(rows, minDistance);
+  } catch (error) {
+    els.bandChanceList.innerHTML = `<li>${error.message}</li>`;
+  } finally {
+    els.bandApplyBtn.disabled = false;
+  }
+}
+
+async function refreshSlots() {
+  if (!currentQueryContext) return;
+  const minDistance = cleanDistanceInput(els.slotMinDistance);
+  els.slotApplyBtn.disabled = true;
+  try {
+    const rows = await runQuery(summarySqlFor(currentQueryContext, minDistance));
+    renderSlots(rows, minDistance);
+  } catch (error) {
+    els.slotList.innerHTML = `<li>${error.message}</li>`;
+  } finally {
+    els.slotApplyBtn.disabled = false;
+  }
+}
+
 async function run() {
   try {
     await resolveCurrentInputs(false);
@@ -1143,32 +1225,19 @@ async function run() {
     els.runBtn.disabled = true;
     els.refreshBtn.disabled = true;
 
-    const summarySql = `
-      SELECT
-        band,
-        toHour(time) AS hour,
-        count() AS spots,
-        uniqExact(tx_sign) AS tx_count,
-        uniqExact(rx_sign) AS rx_count,
-        round(avg(snr), 1) AS avg_snr,
-        max(snr) AS best_snr,
-        argMax(power, snr) AS best_power,
-        countIf(distance >= 3000) AS dx_spots,
-        maxIf(snr, distance >= 3000) AS dx_best_snr,
-        argMaxIf(power, snr, distance >= 3000) AS dx_best_power
-      FROM wspr.rx
-      WHERE ${since} AND band IN (${bandSqlList}) AND ${where}
-        AND tx_loc != ''
-        AND rx_loc != ''
-        AND distance > 0
-      GROUP BY band, hour
-      ORDER BY band, hour`;
+    currentQueryContext = { a, b, days, where, since };
 
-    const summary = await runQuery(summarySql);
+    const slotMinDistance = cleanDistanceInput(els.slotMinDistance);
+    const bandMinDistance = cleanDistanceInput(els.bandMinDistance);
+    const [summary, slotSummary, bandSummary] = await Promise.all([
+      runQuery(summarySqlFor(currentQueryContext, 0)),
+      slotMinDistance ? runQuery(summarySqlFor(currentQueryContext, slotMinDistance)) : Promise.resolve(null),
+      bandMinDistance ? runQuery(summarySqlFor(currentQueryContext, bandMinDistance)) : Promise.resolve(null)
+    ]);
     renderPathMap(a, b);
     renderHeatmap(summary);
-    renderSlots(summary);
-    renderBandChances(summary);
+    renderSlots(slotSummary || summary, slotMinDistance);
+    renderBandChances(bandSummary || summary, bandMinDistance);
     runLiveMap();
     els.queryMeta.textContent = `${a.name} ↔ ${b.name}, ${days} days`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} spots across ${summary.length} band/hour slots.`);
@@ -1281,6 +1350,14 @@ document.addEventListener("click", (event) => {
   }
 });
 els.runBtn.addEventListener("click", run);
+els.bandApplyBtn.addEventListener("click", refreshBandChances);
+els.slotApplyBtn.addEventListener("click", refreshSlots);
+els.bandMinDistance.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") refreshBandChances();
+});
+els.slotMinDistance.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") refreshSlots();
+});
 els.liveRefreshBtn.addEventListener("click", runLiveMap);
 els.liveWindow.addEventListener("change", runLiveMap);
 els.liveDirection.addEventListener("change", runLiveMap);
@@ -1296,6 +1373,10 @@ els.rbnCall.addEventListener("keydown", (event) => {
   if (event.key === "Enter") runRbnMonitor(false);
 });
 els.rbnWindow.addEventListener("change", () => runRbnMonitor(false));
+els.rbnMinDistance.addEventListener("change", () => runRbnMonitor(false));
+els.rbnMinDistance.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") runRbnMonitor(false);
+});
 els.refreshBtn.addEventListener("click", () => {
   loadSpaceWeather();
   run();

@@ -5,7 +5,7 @@ WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagatio
 The project is available in two formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
-- **Android APK**: `releases/WSPRSpyDX-v0.19-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.20-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
 
 ## Features
 
@@ -16,10 +16,12 @@ The project is available in two formats:
 - Includes shortcuts for Scotland, New Zealand, USA East Coast, USA West Coast, and other common regions.
 - Supports history windows from recent days up to longer lookbacks.
 - Shows best bands and best UTC operating windows by band.
-- Displays recent sample spots and per-band path strength.
+- Adds minimum-distance filters for Best By Band, Best Slots, Live Openings, and the CW Reverse Beacon Network monitor.
+- Includes a live openings map with band-coloured paths, hot bands, hot countries, and 100 W mode estimates.
+- Includes a CW Reverse Beacon Network monitor with callsign, time-window, and minimum-distance filtering.
 - Estimates 100 W equivalent signal reports from WSPR SNR and reported transmit power.
 - Shows green/red mode chips for approximate FT8, CW, and SSB viability.
-- Adds a NOAA/SWPC geomagnetic activity warning when recent Kp may make current HF conditions differ from the historical pattern.
+- Adds a NOAA/SWPC geomagnetic activity warning when the last 24 hours of Kp data may make current HF conditions differ from the historical pattern.
 - Uses a bundled local world map image with a curved path between the selected regions.
 - Provides editable latitude/longitude boxes for manual region tuning.
 - Uses a dark, card-based phone layout inspired by RiverWatch Scotland.
@@ -31,6 +33,7 @@ WSPRSpyDX uses live internet data:
 - WSPR spots: `https://db1.wspr.live/`
 - WSPR Live project: `https://wspr.live/`
 - NOAA/SWPC planetary K index: `https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json`
+- Reverse Beacon Network spot feed: `https://www.reversebeacon.net/`
 - Country and region lookup fallback: Nominatim geocoding
 
 The map image is bundled locally. The dashboard does not depend on OpenStreetMap map tiles.
@@ -76,7 +79,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.19-debug.apk
+releases/WSPRSpyDX-v0.20-debug.apk
 ```
 
 To install it on Android:
