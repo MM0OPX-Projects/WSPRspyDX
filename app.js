@@ -86,7 +86,7 @@ const bandColors = new Map([
 ]);
 const countryPrefixes = [
   [/^(2M|GM|MM|MS)/, "Scotland"],
-  [/^(G|M|2E)/, "England"],
+  [/^(G\d|M\d|2E)/, "England"],
   [/^(GW|MW|2W)/, "Wales"],
   [/^(GI|MI|2I)/, "Northern Ireland"],
   [/^(EI|EJ)/, "Ireland"],
@@ -331,6 +331,28 @@ function validatedSpot(row) {
   return { ...row, txCountry, rxCountry };
 }
 
+function expectedCountryForRegion(region) {
+  return countryGeoBoxes.some((box) => box.name === region?.name) ? region.name : null;
+}
+
+function validatedPathSpot(row, context) {
+  const clean = validatedSpot(row);
+  if (!clean || !context) return clean;
+  const expectedA = expectedCountryForRegion(context.a);
+  const expectedB = expectedCountryForRegion(context.b);
+  const txInA = pointInRegion(clean.tx_lat, clean.tx_lon, context.a);
+  const rxInA = pointInRegion(clean.rx_lat, clean.rx_lon, context.a);
+  if (expectedA && txInA && clean.txCountry !== expectedA) return null;
+  if (expectedA && rxInA && clean.rxCountry !== expectedA) return null;
+  if (context.b) {
+    const txInB = pointInRegion(clean.tx_lat, clean.tx_lon, context.b);
+    const rxInB = pointInRegion(clean.rx_lat, clean.rx_lon, context.b);
+    if (expectedB && txInB && clean.txCountry !== expectedB) return null;
+    if (expectedB && rxInB && clean.rxCountry !== expectedB) return null;
+  }
+  return clean;
+}
+
 function liveWorkability(row) {
   const snr100w = scaledSnr(row.snr, row.power);
   return { snr100w, rank: modeRank(snr100w) };
@@ -540,10 +562,11 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
   const viewHeight = 1024;
   const focusPoint = mapProject(boxCenter(focus));
   const totalSpots = Number(totals?.spots ?? rows.length);
-  const enrichedRows = rows.map((row) => {
+  const pathContext = { a: focus, b: null };
+  const enrichedRows = rows.map((row) => validatedPathSpot(row, pathContext)).filter(Boolean).map((row) => {
     const remoteSign = row.flow === "sent" ? row.rx_sign : row.tx_sign;
     const workability = liveWorkability(row);
-    return { ...row, remoteSign, remoteCountry: callsignCountry(remoteSign), ...workability };
+    return { ...row, remoteSign, remoteCountry: stationCountry(remoteSign, row.remote_lat, row.remote_lon) || "Unknown", ...workability };
   }).filter(hasUsableRemoteGeo);
   const removedRows = rows.length - enrichedRows.length;
   const hotBands = [...enrichedRows.reduce((map, row) => {
@@ -1183,6 +1206,52 @@ function renderHeatmap(rows) {
   els.heatmap.innerHTML = body ? header + body : `<tr><td>No WSPR spots found for this path.</td></tr>`;
 }
 
+function aggregateSummaryRows(rows, context) {
+  const buckets = new Map();
+  rows.forEach((row) => {
+    const clean = validatedPathSpot(row, context);
+    if (!clean) return;
+    const band = Number(clean.band);
+    const hour = Number(clean.hour);
+    const key = `${band}-${hour}`;
+    const bucket = buckets.get(key) || {
+      band,
+      hour,
+      spots: 0,
+      txSigns: new Set(),
+      rxSigns: new Set(),
+      snrTotal: 0,
+      best_snr: -Infinity,
+      best_power: 0,
+      countries: new Set()
+    };
+    bucket.spots += 1;
+    bucket.txSigns.add(clean.tx_sign);
+    bucket.rxSigns.add(clean.rx_sign);
+    bucket.snrTotal += Number(clean.snr);
+    bucket.countries.add(`${clean.txCountry} to ${clean.rxCountry}`);
+    if (Number(clean.snr) > bucket.best_snr) {
+      bucket.best_snr = Number(clean.snr);
+      bucket.best_power = Number(clean.power);
+    }
+    buckets.set(key, bucket);
+  });
+  return [...buckets.values()]
+    .filter((bucket) => bucket.countries.size > 0)
+    .map((bucket) => ({
+      band: bucket.band,
+      hour: bucket.hour,
+      spots: bucket.spots,
+      tx_count: bucket.txSigns.size,
+      rx_count: bucket.rxSigns.size,
+      avg_snr: Math.round((bucket.snrTotal / bucket.spots) * 10) / 10,
+      best_snr: bucket.best_snr,
+      best_power: bucket.best_power,
+      country_count: bucket.countries.size
+    }))
+    .sort((a, b) => Number(a.band) - Number(b.band) || Number(a.hour) - Number(b.hour));
+}
+
 function ensureBandDetailPanel() {
   if (!els.bandDetailPanel || !document.body.contains(els.bandDetailPanel)) {
     const panel = document.createElement("li");
@@ -1310,7 +1379,7 @@ async function runLiveMap() {
         rx_sign,
         snr,
         power,
-        distance,
+        round(${spotDistanceKmExpr}, 1) AS distance,
         if(${focusTx}, 'sent', 'heard') AS flow,
         if(${focusTx}, rx_lat, tx_lat) AS remote_lat,
         if(${focusTx}, rx_lon, tx_lon) AS remote_lon
@@ -1322,7 +1391,7 @@ async function runLiveMap() {
         AND rx_lat BETWEEN -90 AND 90
         AND tx_lon BETWEEN -180 AND 180
         AND rx_lon BETWEEN -180 AND 180
-        AND distance >= ${minDistance}
+        AND ${spotDistanceKmExpr} >= ${minDistance}
       ORDER BY distance DESC, time DESC
       LIMIT ${liveRowLimit}`;
     const totalSql = `
@@ -1335,7 +1404,7 @@ async function runLiveMap() {
         AND rx_lat BETWEEN -90 AND 90
         AND tx_lon BETWEEN -180 AND 180
         AND rx_lon BETWEEN -180 AND 180
-        AND distance >= ${minDistance}`;
+        AND ${spotDistanceKmExpr} >= ${minDistance}`;
     els.liveRefreshBtn.disabled = true;
     els.liveSummary.textContent = `Checking live WSPR spots for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""}...`;
     const [rows, totalRows] = await Promise.all([runQuery(sql), runQuery(totalSql)]);
@@ -1351,17 +1420,21 @@ async function runLiveMap() {
   }
 }
 
-function summarySqlFor(context, minDistance = 0) {
+function summaryCandidateSqlFor(context, minDistance = 0) {
   return `
       SELECT
+        time,
         band,
         toHour(time) AS hour,
-        count() AS spots,
-        uniqExact(tx_sign) AS tx_count,
-        uniqExact(rx_sign) AS rx_count,
-        round(avg(snr), 1) AS avg_snr,
-        max(snr) AS best_snr,
-        argMax(power, snr) AS best_power
+        tx_sign,
+        rx_sign,
+        tx_lat,
+        tx_lon,
+        rx_lat,
+        rx_lon,
+        round(${spotDistanceKmExpr}, 1) AS distance,
+        snr,
+        power
       FROM wspr.rx
       WHERE ${context.since} AND band IN (${bandSqlList}) AND ${context.where}
         AND tx_loc != ''
@@ -1369,8 +1442,8 @@ function summarySqlFor(context, minDistance = 0) {
         ${validSpotCoordsSql}
         AND ${spotDistanceKmExpr} > 0
         AND ${spotDistanceKmExpr} >= ${minDistance}
-      GROUP BY band, hour
-      ORDER BY band, hour`;
+      ORDER BY distance DESC, time DESC
+      LIMIT 80000`;
 }
 
 function bandSpotSqlFor(context, band, startHour, minDistance = 0) {
@@ -1474,7 +1547,7 @@ async function showBandSpotDetails(band, startHour, tile) {
   els.bandSpotTable.innerHTML = "";
   try {
     const rows = await runQuery(bandSpotSqlFor(currentQueryContext, band, startHour, minDistance));
-    const cleanRows = rows.map(validatedSpot).filter(Boolean).slice(0, 100);
+    const cleanRows = rows.map((row) => validatedPathSpot(row, currentQueryContext)).filter(Boolean).slice(0, 100);
     renderBandSpotDetails(band, startHour, cleanRows, minDistance);
   } catch (error) {
     els.bandDetailTitle.textContent = `${bandLabel(band)} spot detail unavailable`;
@@ -1500,7 +1573,8 @@ async function run() {
 
     const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
     currentPathMinDistance = pathMinDistance;
-    const summary = await runQuery(summarySqlFor(currentQueryContext, pathMinDistance));
+    const summaryCandidates = await runQuery(summaryCandidateSqlFor(currentQueryContext, pathMinDistance));
+    const summary = aggregateSummaryRows(summaryCandidates, currentQueryContext);
     renderPathMap(a, b);
     renderHeatmap(summary);
     renderBandChances(summary, pathMinDistance);
