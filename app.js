@@ -254,9 +254,13 @@ function fillBox(prefix, box) {
   updateMapFromBoxes();
 }
 
+function isAnywhereTarget(prefix = "b") {
+  return !els[`${prefix}Country`].value.trim();
+}
+
 function updateMapFromBoxes() {
   try {
-    renderPathMap(readBox("a"), readBox("b"));
+    renderPathMap(readBox("a"), isAnywhereTarget("b") ? null : readBox("b"));
   } catch (error) {
     // The map will render once both region boxes contain valid numbers.
   }
@@ -315,20 +319,50 @@ function greatCircleKm(latA, lonA, latB, lonB) {
   return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-function renderPathMap(a, b) {
+function renderPathMap(a, b = null) {
   const aCenter = boxCenter(a);
-  const bCenter = boxCenter(b);
   const viewWidth = 1536;
   const viewHeight = 1024;
   const aPoint = mapProject(aCenter);
+  const labelX = (point) => Math.min(viewWidth - 240, Math.max(24, point.x + 18));
+  const labelY = (point) => Math.min(viewHeight - 30, Math.max(36, point.y - 16));
+  if (!b) {
+    const remotePoints = [
+      { lat: 56, lon: -105 },
+      { lat: 39, lon: -96 },
+      { lat: -15, lon: -55 },
+      { lat: -25, lon: 134 },
+      { lat: -41, lon: 174 },
+      { lat: 35, lon: 104 }
+    ].map(mapProject);
+    const route = (point) => {
+      const dx = point.x - aPoint.x;
+      const dy = point.y - aPoint.y;
+      const curve = Math.min(190, Math.max(70, Math.hypot(dx, dy) * 0.14));
+      const midX = (aPoint.x + point.x) / 2;
+      const midY = (aPoint.y + point.y) / 2 - curve;
+      return `M ${aPoint.x.toFixed(1)} ${aPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+    };
+    els.mapMeta.textContent = `${a.name} to anywhere`;
+    els.pathMap.innerHTML = `
+      <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="${a.name} to anywhere path">
+        <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
+        ${remotePoints.map((point) => `<path class="map-route-shadow map-route-fan" d="${route(point)}"></path>`).join("")}
+        ${remotePoints.map((point) => `<path class="map-route map-route-fan" d="${route(point)}"></path>`).join("")}
+        <circle class="map-pin a" cx="${aPoint.x.toFixed(1)}" cy="${aPoint.y.toFixed(1)}" r="12"></circle>
+        <text class="map-label" x="${labelX(aPoint).toFixed(1)}" y="${labelY(aPoint).toFixed(1)}">${a.name}</text>
+        <text class="map-label anywhere" x="1180" y="890">Anywhere</text>
+      </svg>
+    `;
+    return;
+  }
+  const bCenter = boxCenter(b);
   const bPoint = mapProject(bCenter);
   const dx = bPoint.x - aPoint.x;
   const dy = bPoint.y - aPoint.y;
   const curve = Math.min(190, Math.max(70, Math.hypot(dx, dy) * 0.16));
   const midX = (aPoint.x + bPoint.x) / 2;
   const midY = (aPoint.y + bPoint.y) / 2 - curve;
-  const labelX = (point) => Math.min(viewWidth - 240, Math.max(24, point.x + 18));
-  const labelY = (point) => Math.min(viewHeight - 30, Math.max(36, point.y - 16));
   els.mapMeta.textContent = `${a.name} to ${b.name}`;
   els.pathMap.innerHTML = `
     <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="${a.name} to ${b.name} path">
@@ -878,6 +912,7 @@ async function resolveCountry(prefix, shouldReport = true) {
 
   try {
     const matches = await lookupRegion(value);
+    if (input.value.trim() !== value) return;
     renderCountryOptions(prefix, matches);
     if (!matches.length) {
       if (shouldReport) setStatus(`No country or major region match for "${value}".`, true);
@@ -935,7 +970,16 @@ function regionWhere(prefix, box) {
   return `(${boxes.map((part) => `${prefix}_lat BETWEEN ${part.latMin} AND ${part.latMax} AND ${prefix}_lon BETWEEN ${part.lonMin} AND ${part.lonMax}`).join(" OR ")})`;
 }
 
-function pathWhere(a, b) {
+function pathWhere(a, b = null) {
+  if (!b) {
+    const txA = regionWhere("tx", a);
+    const rxA = regionWhere("rx", a);
+    const fromA = `(${txA} AND NOT ${rxA})`;
+    const toA = `(${rxA} AND NOT ${txA})`;
+    if (els.direction.value === "ab") return fromA;
+    if (els.direction.value === "ba") return toA;
+    return `(${fromA} OR ${toA})`;
+  }
   const ab = `(${regionWhere("tx", a)} AND ${regionWhere("rx", b)})`;
   const ba = `(${regionWhere("tx", b)} AND ${regionWhere("rx", a)})`;
   if (els.direction.value === "ab") return ab;
@@ -1171,12 +1215,13 @@ async function run() {
   try {
     await resolveCurrentInputs(false);
     const a = readBox("a");
-    const b = readBox("b");
+    const b = isAnywhereTarget("b") ? null : readBox("b");
     const days = Math.min(90, Math.max(1, Number(els.period.value)));
     const where = pathWhere(a, b);
     const since = `time >= now() - INTERVAL ${days} DAY`;
+    const pathLabel = b ? `${a.name} to ${b.name}` : `${a.name} to anywhere`;
 
-    setStatus(`Querying ${a.name} ↔ ${b.name} over ${days} days...`);
+    setStatus(`Querying ${pathLabel} over ${days} days...`);
     els.runBtn.disabled = true;
     els.refreshBtn.disabled = true;
 
@@ -1191,7 +1236,7 @@ async function run() {
     renderHeatmap(summary);
     renderBandChances(bandSummary || summary, bandMinDistance);
     runLiveMap();
-    els.queryMeta.textContent = `${a.name} ↔ ${b.name}, ${days} days`;
+    els.queryMeta.textContent = `${pathLabel}, ${days} days`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} spots across ${summary.length} band/hour slots.`);
   } catch (error) {
     setStatus(error.message, true);
@@ -1212,6 +1257,12 @@ function modeDefault(prefix, mode) {
 }
 
 function modePlaceholder(prefix, mode) {
+  if (prefix === "b") {
+    if (mode === "cq") return "Leave blank for anywhere, or enter 14";
+    if (mode === "itu") return "Leave blank for anywhere, or enter 27";
+    if (mode === "locator") return "Leave blank for anywhere, or enter IO75";
+    return "Leave blank for anywhere";
+  }
   const placeholders = {
     country: prefix === "a" ? "Scotland" : "New Zealand",
     cq: prefix === "a" ? "14" : "32",
@@ -1232,7 +1283,7 @@ function modeInputLabel(prefix, mode) {
 function modeHelpText() {
   const aText = els.aMode.options[els.aMode.selectedIndex].text;
   const bText = els.bMode.options[els.bMode.selectedIndex].text;
-  els.modeNote.textContent = `Path input: A uses ${aText}; B uses ${bText}. Countries autocomplete; zones and locators can be comma separated.`;
+  els.modeNote.textContent = `Path input: A uses ${aText}; B uses ${bText}. Countries autocomplete; zones and locators can be comma separated. Leave Region B blank for Region A to anywhere.`;
 }
 
 function resolveStructuredInput(prefix, shouldReport = true) {
@@ -1247,6 +1298,13 @@ function resolveStructuredInput(prefix, shouldReport = true) {
 }
 
 async function resolvePathInput(prefix, shouldReport = true) {
+  if (prefix === "b" && isAnywhereTarget("b")) {
+    els.bSuggestions.classList.remove("open");
+    els.bCountryOptions.innerHTML = "";
+    updateMapFromBoxes();
+    if (shouldReport) setStatus("Region B left blank: checking Region A to anywhere.");
+    return null;
+  }
   if (els[`${prefix}Mode`].value === "country") return resolveCountry(prefix, shouldReport);
   return resolveStructuredInput(prefix, shouldReport);
 }
@@ -1280,6 +1338,12 @@ els.aCountry.addEventListener("input", () => {
   }
 });
 els.bCountry.addEventListener("input", () => {
+  if (isAnywhereTarget("b")) {
+    els.bSuggestions.classList.remove("open");
+    els.bCountryOptions.innerHTML = "";
+    updateMapFromBoxes();
+    return;
+  }
   if (els.bMode.value === "country") scheduleCountryLookup("b");
   else {
     try { resolveStructuredInput("b", false); } catch (error) {}

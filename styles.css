@@ -601,6 +601,14 @@ h2 {
   opacity: .85;
 }
 
+.map-route-fan {
+  opacity: .58;
+}
+
+.map-route-shadow.map-route-fan {
+  opacity: .32;
+}
+
 .map-pin {
   stroke: #ffffff;
   stroke-width: 6;

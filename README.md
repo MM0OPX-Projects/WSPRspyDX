@@ -1,16 +1,17 @@
 ﻿# WSPRSpyDX
 
-WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagation between two countries or regions. It is aimed at quick phone use: choose Region A and Region B, pick a history window, then use the spot counts, band summaries, UTC windows, and signal estimates to judge whether a path is worth trying.
+WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagation between two countries, regions, zones, locators, or from one region to anywhere. It is aimed at quick phone use: choose Region A, optionally choose Region B, pick a history window, then use the spot counts, band summaries, UTC windows, and signal estimates to judge whether a path is worth trying.
 
 The project is available in two formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
-- **Android APK**: `releases/WSPRSpyDX-v0.24-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.25-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
 
 ## Features
 
 - Queries historical WSPR spots from the public WSPR Live ClickHouse endpoint.
 - Lets you type countries or major regions for each end of the path.
+- Lets you leave Region B blank to check Region A against anywhere, then use minimum distance for DX filtering.
 - Adds path modes for country/region, CQ zone, ITU zone, and Maidenhead locator searches.
 - Supports multiple target zones or locators, for example `14` to `1,2`.
 - Includes shortcuts for Scotland, New Zealand, USA East Coast, USA West Coast, and other common regions.
@@ -79,7 +80,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.24-debug.apk
+releases/WSPRSpyDX-v0.25-debug.apk
 ```
 
 To install it on Android:
@@ -115,7 +116,7 @@ The current test APK was built locally from this wrapper and the dashboard asset
 |-- world-map.png
 |-- android-apk/
 `-- releases/
-    `-- WSPRSpyDX-v0.19-debug.apk
+    `-- WSPRSpyDX-v0.25-debug.apk
 ```
 
 ## Notes
