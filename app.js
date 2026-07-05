@@ -134,6 +134,55 @@ const countryPrefixes = [
   [/^(BY|BA|BD|BG|BH|BI|BJ|BL|BM|BN|BO|BP|BQ|BR|BS|BT|BU|BV|BW|BX|3H|3I|3J|3K|3L|3M|3N|3O|3P|3Q|3R|3S|3T|3U)/, "China"]
 ];
 
+const countryGeoBoxes = [
+  { name: "Scotland", latMin: 54.5, latMax: 61.1, lonMin: -8.9, lonMax: -0.5 },
+  { name: "England", latMin: 49.8, latMax: 55.9, lonMin: -6.5, lonMax: 1.9 },
+  { name: "Wales", latMin: 51.3, latMax: 53.5, lonMin: -5.4, lonMax: -2.6 },
+  { name: "Northern Ireland", latMin: 54.0, latMax: 55.4, lonMin: -8.3, lonMax: -5.3 },
+  { name: "Ireland", latMin: 51.3, latMax: 55.5, lonMin: -10.7, lonMax: -5.4 },
+  { name: "New Zealand", latMin: -47.5, latMax: -34.0, lonMin: 166.0, lonMax: 179.9 },
+  { name: "Australia", latMin: -43.8, latMax: -10.0, lonMin: 113.0, lonMax: 154.0 },
+  { name: "Japan", latMin: 30.0, latMax: 46.0, lonMin: 129.0, lonMax: 146.5 },
+  { name: "United States", latMin: 24.0, latMax: 49.5, lonMin: -125.0, lonMax: -66.0 },
+  { name: "Canada", latMin: 41.7, latMax: 70.0, lonMin: -141.0, lonMax: -52.6 },
+  { name: "France", latMin: 41.3, latMax: 51.2, lonMin: -5.2, lonMax: 9.7 },
+  { name: "Germany", latMin: 47.2, latMax: 55.1, lonMin: 5.8, lonMax: 15.1 },
+  { name: "Spain", latMin: 36.0, latMax: 43.9, lonMin: -9.4, lonMax: 3.4 },
+  { name: "Portugal", latMin: 36.9, latMax: 42.2, lonMin: -9.6, lonMax: -6.1 },
+  { name: "Italy", latMin: 36.6, latMax: 47.1, lonMin: 6.6, lonMax: 18.6 },
+  { name: "Brazil", latMin: -33.8, latMax: 5.3, lonMin: -73.9, lonMax: -34.7 },
+  { name: "Netherlands", latMin: 50.7, latMax: 53.7, lonMin: 3.3, lonMax: 7.3 },
+  { name: "Belgium", latMin: 49.4, latMax: 51.6, lonMin: 2.5, lonMax: 6.5 },
+  { name: "Switzerland", latMin: 45.7, latMax: 47.9, lonMin: 5.8, lonMax: 10.6 },
+  { name: "Austria", latMin: 46.3, latMax: 49.1, lonMin: 9.5, lonMax: 17.2 },
+  { name: "Norway", latMin: 57.8, latMax: 71.2, lonMin: 4.0, lonMax: 31.5 },
+  { name: "Sweden", latMin: 55.0, latMax: 69.2, lonMin: 11.0, lonMax: 24.5 },
+  { name: "Finland", latMin: 59.5, latMax: 70.2, lonMin: 19.0, lonMax: 31.6 },
+  { name: "Denmark", latMin: 54.4, latMax: 57.9, lonMin: 8.0, lonMax: 15.3 },
+  { name: "Poland", latMin: 49.0, latMax: 54.9, lonMin: 14.0, lonMax: 24.3 },
+  { name: "Czechia", latMin: 48.5, latMax: 51.1, lonMin: 12.0, lonMax: 18.9 },
+  { name: "Slovakia", latMin: 47.7, latMax: 49.7, lonMin: 16.8, lonMax: 22.6 },
+  { name: "Hungary", latMin: 45.7, latMax: 48.6, lonMin: 16.0, lonMax: 22.9 },
+  { name: "Croatia", latMin: 42.3, latMax: 46.6, lonMin: 13.4, lonMax: 19.5 },
+  { name: "Serbia", latMin: 42.2, latMax: 46.2, lonMin: 18.8, lonMax: 23.1 },
+  { name: "Bulgaria", latMin: 41.2, latMax: 44.3, lonMin: 22.3, lonMax: 28.7 },
+  { name: "Romania", latMin: 43.6, latMax: 48.3, lonMin: 20.2, lonMax: 29.8 },
+  { name: "Greece", latMin: 34.7, latMax: 41.8, lonMin: 19.0, lonMax: 28.5 },
+  { name: "Luxembourg", latMin: 49.4, latMax: 50.2, lonMin: 5.7, lonMax: 6.6 },
+  { name: "Latvia", latMin: 55.6, latMax: 58.1, lonMin: 20.8, lonMax: 28.3 },
+  { name: "Russia", latMin: 41.0, latMax: 82.0, lonMin: 19.0, lonMax: 180.0 },
+  { name: "Turkey", latMin: 35.8, latMax: 42.2, lonMin: 25.5, lonMax: 45.0 },
+  { name: "Israel", latMin: 29.4, latMax: 33.4, lonMin: 34.2, lonMax: 35.9 },
+  { name: "South Africa", latMin: -35.0, latMax: -22.0, lonMin: 16.0, lonMax: 33.0 },
+  { name: "Argentina", latMin: -55.1, latMax: -21.8, lonMin: -73.6, lonMax: -53.6 },
+  { name: "Uruguay", latMin: -35.1, latMax: -30.0, lonMin: -58.6, lonMax: -53.0 },
+  { name: "Chile", latMin: -56.0, latMax: -17.5, lonMin: -76.0, lonMax: -66.0 },
+  { name: "Indonesia", latMin: -11.2, latMax: 6.3, lonMin: 95.0, lonMax: 141.0 },
+  { name: "Philippines", latMin: 4.5, latMax: 21.2, lonMin: 116.0, lonMax: 127.0 },
+  { name: "South Korea", latMin: 33.0, latMax: 39.5, lonMin: 124.0, lonMax: 132.0 },
+  { name: "China", latMin: 18.0, latMax: 54.0, lonMin: 73.0, lonMax: 135.0 }
+];
+
 const els = {
   aMode: document.querySelector("#aMode"),
   aCountry: document.querySelector("#aCountry"),
@@ -239,6 +288,47 @@ function callsignCountry(callsign) {
   const clean = normaliseCallsign(callsign);
   const match = countryPrefixes.find(([pattern]) => pattern.test(clean));
   return match ? match[1] : "Unknown";
+}
+
+function countryFromCoords(lat, lon) {
+  const pointLat = Number(lat);
+  const pointLon = Number(lon);
+  if (!Number.isFinite(pointLat) || !Number.isFinite(pointLon)) return "Unknown";
+  const match = countryGeoBoxes.find((box) =>
+    pointLat >= box.latMin &&
+    pointLat <= box.latMax &&
+    pointLon >= box.lonMin &&
+    pointLon <= box.lonMax
+  );
+  return match?.name || "Unknown";
+}
+
+function callsignMatchesCoords(country, lat, lon) {
+  if (!country || country === "Unknown") return false;
+  const boxes = countryGeoBoxes.filter((box) => box.name === country);
+  if (!boxes.length) return true;
+  return boxes.some((box) =>
+    Number(lat) >= box.latMin &&
+    Number(lat) <= box.latMax &&
+    Number(lon) >= box.lonMin &&
+    Number(lon) <= box.lonMax
+  );
+}
+
+function stationCountry(sign, lat, lon) {
+  const prefixCountry = callsignCountry(sign);
+  const locatorCountry = countryFromCoords(lat, lon);
+  if (prefixCountry !== "Unknown") {
+    return callsignMatchesCoords(prefixCountry, lat, lon) ? prefixCountry : null;
+  }
+  return locatorCountry !== "Unknown" ? locatorCountry : null;
+}
+
+function validatedSpot(row) {
+  const txCountry = stationCountry(row.tx_sign, row.tx_lat, row.tx_lon);
+  const rxCountry = stationCountry(row.rx_sign, row.rx_lat, row.rx_lon);
+  if (!txCountry || !rxCountry) return null;
+  return { ...row, txCountry, rxCountry };
 }
 
 function liveWorkability(row) {
@@ -1291,6 +1381,8 @@ function bandSpotSqlFor(context, band, startHour, minDistance = 0) {
         band,
         tx_sign,
         rx_sign,
+        tx_loc,
+        rx_loc,
         tx_lat,
         tx_lon,
         rx_lat,
@@ -1310,17 +1402,17 @@ function bandSpotSqlFor(context, band, startHour, minDistance = 0) {
         AND ${spotDistanceKmExpr} > 0
         AND ${spotDistanceKmExpr} >= ${minDistance}
       ORDER BY distance DESC, (snr + (50 - power)) DESC, time DESC
-      LIMIT 100`;
+      LIMIT 400`;
 }
 
 function remoteCountryForSpot(row, context) {
   if (!context?.b) {
     const txInA = pointInRegion(row.tx_lat, row.tx_lon, context.a);
     const rxInA = pointInRegion(row.rx_lat, row.rx_lon, context.a);
-    if (txInA && !rxInA) return callsignCountry(row.rx_sign);
-    if (rxInA && !txInA) return callsignCountry(row.tx_sign);
+    if (txInA && !rxInA) return row.rxCountry;
+    if (rxInA && !txInA) return row.txCountry;
   }
-  return `${callsignCountry(row.tx_sign)} to ${callsignCountry(row.rx_sign)}`;
+  return `${row.txCountry} to ${row.rxCountry}`;
 }
 
 function formatSpotTime(value) {
@@ -1360,7 +1452,7 @@ function renderBandSpotDetails(band, startHour, rows, minDistance) {
           <td>${bandLabel(row.band)}</td>
           <td>${escapeHtml(row.tx_sign)}</td>
           <td>${escapeHtml(row.rx_sign)}</td>
-          <td>${escapeHtml(callsignCountry(row.tx_sign))} -&gt; ${escapeHtml(callsignCountry(row.rx_sign))}</td>
+          <td>${escapeHtml(row.txCountry)} -&gt; ${escapeHtml(row.rxCountry)}</td>
           <td>${Math.round(Number(row.distance)).toLocaleString()} km</td>
           <td>${Number(row.snr).toFixed(0)} dB</td>
           <td>${Number(row.power).toFixed(0)} dBm</td>
@@ -1382,7 +1474,8 @@ async function showBandSpotDetails(band, startHour, tile) {
   els.bandSpotTable.innerHTML = "";
   try {
     const rows = await runQuery(bandSpotSqlFor(currentQueryContext, band, startHour, minDistance));
-    renderBandSpotDetails(band, startHour, rows, minDistance);
+    const cleanRows = rows.map(validatedSpot).filter(Boolean).slice(0, 100);
+    renderBandSpotDetails(band, startHour, cleanRows, minDistance);
   } catch (error) {
     els.bandDetailTitle.textContent = `${bandLabel(band)} spot detail unavailable`;
     els.bandDetailMeta.textContent = error.message;
