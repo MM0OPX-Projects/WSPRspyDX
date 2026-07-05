@@ -331,7 +331,7 @@ h2 {
 
 .card-filter {
   display: grid;
-  grid-template-columns: auto auto minmax(92px, 130px) auto;
+  grid-template-columns: auto minmax(128px, auto) minmax(76px, 110px) auto;
   gap: 8px;
   align-items: center;
 }
@@ -342,6 +342,7 @@ h2 {
   font-weight: 900;
   letter-spacing: .08em;
   text-transform: uppercase;
+  white-space: normal;
 }
 
 .card-filter input,
@@ -357,7 +358,7 @@ h2 {
 
 .live-controls {
   display: grid;
-  grid-template-columns: auto minmax(92px, 130px) auto minmax(126px, 170px) auto minmax(96px, 140px) minmax(120px, 150px);
+  grid-template-columns: auto minmax(92px, 130px) auto minmax(126px, 170px) minmax(128px, auto) minmax(76px, 120px) minmax(120px, 150px);
   gap: 8px;
   align-items: center;
 }
@@ -384,7 +385,7 @@ h2 {
 }
 
 .rbn-controls {
-  grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) auto minmax(96px, 140px) minmax(110px, 140px);
+  grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) minmax(128px, auto) minmax(76px, 120px) minmax(110px, 140px);
 }
 
 .live-bands,
@@ -829,10 +830,6 @@ h2 {
     margin-top: 10px;
   }
 
-  .live-controls label {
-    display: none;
-  }
-
   .live-controls button {
     grid-column: 1 / -1;
   }
@@ -847,9 +844,12 @@ h2 {
     margin-top: 8px;
   }
 
-  .card-filter span,
-  .card-filter label {
+  .card-filter span {
     display: none;
+  }
+
+  .card-filter button {
+    grid-column: 1 / -1;
   }
 
 }
