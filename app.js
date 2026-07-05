@@ -581,9 +581,12 @@ function renderRbnMap(spots, call) {
 }
 
 function renderRbnTable(spots) {
+  const rankedSpots = [...spots]
+    .sort((a, b) => Number(b.distance) - Number(a.distance) || Number(b.epoch) - Number(a.epoch))
+    .slice(0, 100);
   els.rbnTable.innerHTML = spots.length ? `
     <tr><th>UTC</th><th>Band</th><th>Spotter</th><th>Country</th><th>Distance</th><th>SNR</th><th>Speed</th><th>Freq</th></tr>
-    ${spots.slice(0, 30).map((spot) => `
+    ${rankedSpots.map((spot) => `
       <tr>
         <td>${spot.time}</td>
         <td>${spot.bandMeters}m</td>
