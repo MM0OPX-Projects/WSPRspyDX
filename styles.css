@@ -704,14 +704,18 @@ h2 {
   min-width: 0;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: .72rem;
+  font-size: clamp(.58rem, 1.45vw, .74rem);
 }
 
 .heatmap th,
 .heatmap td {
   height: 28px;
+  min-width: 0;
+  padding: 0 2px;
   border: 1px solid rgba(255,255,255,.08);
   text-align: center;
+  overflow: hidden;
+  line-height: 1;
 }
 
 .heatmap th {
@@ -723,10 +727,32 @@ h2 {
 .heatmap td {
   color: #07130e;
   font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap td span {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .heatmap-cell {
   cursor: pointer;
+}
+
+.heatmap-cell.digits-4 span {
+  font-size: .92em;
+}
+
+.heatmap-cell.digits-5 span {
+  font-size: .78em;
+}
+
+.heatmap-cell.digits-6 span {
+  font-size: .68em;
 }
 
 .heatmap-cell:focus-visible {
@@ -964,18 +990,30 @@ h2 {
   }
 
   .heatmap {
-    font-size: .66rem;
+    font-size: clamp(.48rem, 2.15vw, .66rem);
   }
 
   .heatmap th,
   .heatmap td {
     height: 25px;
-    padding: 0 2px;
+    padding: 0 1px;
   }
 
   .heatmap th:first-child,
   .heatmap td:first-child {
-    width: 34px;
+    width: 40px;
+  }
+
+  .heatmap-cell.digits-4 span {
+    font-size: .88em;
+  }
+
+  .heatmap-cell.digits-5 span {
+    font-size: .68em;
+  }
+
+  .heatmap-cell.digits-6 span {
+    font-size: .58em;
   }
 
   .suggestions {
