@@ -1032,13 +1032,13 @@ function renderBandChances(rows, minDistance = 0) {
     for (let start = 0; start < 24; start += 1) {
       const windowRows = [0, 1].map((offset) => hourMap.get((start + offset) % 24)).filter(Boolean);
       const spots = windowRows.reduce((sum, row) => sum + Number(row.spots), 0);
-      const best = windowRows.sort((a, b) => Number(b.best_snr) - Number(a.best_snr))[0] || data.rows[0];
+      const best = [...windowRows].sort((a, b) => Number(b.best_snr) - Number(a.best_snr))[0] || data.rows[0];
       const snr100w = scaledSnr(best.best_snr, best.best_power);
       const mode = modeRank(snr100w);
       if (
-        mode > bestWindow.mode ||
-        (mode === bestWindow.mode && snr100w > bestWindow.snr100w) ||
-        (mode === bestWindow.mode && snr100w === bestWindow.snr100w && spots > bestWindow.spots)
+        spots > bestWindow.spots ||
+        (spots === bestWindow.spots && mode > bestWindow.mode) ||
+        (spots === bestWindow.spots && mode === bestWindow.mode && snr100w > bestWindow.snr100w)
       ) {
         bestWindow = { start, spots, best, snr100w, mode };
       }
