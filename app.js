@@ -249,6 +249,7 @@ const els = {
 
 let currentQueryContext = null;
 let currentPathMinDistance = 0;
+let suppressMapPreview = false;
 
 function normaliseName(value) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -405,6 +406,7 @@ function isAnywhereTarget(prefix = "b") {
 }
 
 function updateMapFromBoxes() {
+  if (suppressMapPreview) return;
   try {
     renderPathMap(readBox("a"), isAnywhereTarget("b") ? null : readBox("b"));
   } catch (error) {
@@ -465,39 +467,61 @@ function greatCircleKm(latA, lonA, latB, lonB) {
   return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-function renderPathMap(a, b = null) {
+function renderPathMap(a, b = null, rows = []) {
   const aCenter = boxCenter(a);
   const viewWidth = 1536;
   const viewHeight = 1024;
   const aPoint = mapProject(aCenter);
   const labelX = (point) => Math.min(viewWidth - 240, Math.max(24, point.x + 18));
   const labelY = (point) => Math.min(viewHeight - 30, Math.max(36, point.y - 16));
+  const route = (point, curveFactor = 0.14) => {
+    const dx = point.x - aPoint.x;
+    const dy = point.y - aPoint.y;
+    const curve = Math.min(190, Math.max(70, Math.hypot(dx, dy) * curveFactor));
+    const midX = (aPoint.x + point.x) / 2;
+    const midY = (aPoint.y + point.y) / 2 - curve;
+    return `M ${aPoint.x.toFixed(1)} ${aPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+  };
   if (!b) {
-    const remotePoints = [
-      { lat: 56, lon: -105 },
-      { lat: 39, lon: -96 },
-      { lat: -15, lon: -55 },
-      { lat: -25, lon: 134 },
-      { lat: -41, lon: 174 },
-      { lat: 35, lon: 104 }
-    ].map(mapProject);
-    const route = (point) => {
-      const dx = point.x - aPoint.x;
-      const dy = point.y - aPoint.y;
-      const curve = Math.min(190, Math.max(70, Math.hypot(dx, dy) * 0.14));
-      const midX = (aPoint.x + point.x) / 2;
-      const midY = (aPoint.y + point.y) / 2 - curve;
-      return `M ${aPoint.x.toFixed(1)} ${aPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-    };
-    els.mapMeta.textContent = `${a.name} to anywhere`;
+    const remoteMap = new Map();
+    rows.forEach((row) => {
+      const clean = validatedPathSpot(row, { a, b: null });
+      if (!clean) return;
+      const txInA = pointInRegion(clean.tx_lat, clean.tx_lon, a);
+      const rxInA = pointInRegion(clean.rx_lat, clean.rx_lon, a);
+      if (txInA === rxInA) return;
+      const remote = txInA
+        ? { country: clean.rxCountry, lat: clean.rx_lat, lon: clean.rx_lon, distance: Number(clean.distance) }
+        : { country: clean.txCountry, lat: clean.tx_lat, lon: clean.tx_lon, distance: Number(clean.distance) };
+      if (!remote.country || remote.country === "Unknown") return;
+      const current = remoteMap.get(remote.country) || { ...remote, spots: 0, maxDistance: 0 };
+      current.spots += 1;
+      if (remote.distance > current.maxDistance) {
+        current.lat = remote.lat;
+        current.lon = remote.lon;
+        current.maxDistance = remote.distance;
+      }
+      remoteMap.set(remote.country, current);
+    });
+    const remotePoints = [...remoteMap.values()]
+      .sort((left, right) => right.spots - left.spots || right.maxDistance - left.maxDistance)
+      .slice(0, 10)
+      .map((remote) => ({ ...remote, point: mapProject(remote) }));
+    els.mapMeta.textContent = remotePoints.length
+      ? `${a.name} to anywhere (${remotePoints.length} validated DX areas)`
+      : `${a.name} to anywhere (no validated mapped spots)`;
     els.pathMap.innerHTML = `
       <svg viewBox="0 0 ${viewWidth} ${viewHeight}" role="img" aria-label="${a.name} to anywhere path">
         <image class="map-base" href="world-map.png" x="0" y="0" width="${viewWidth}" height="${viewHeight}" preserveAspectRatio="none"></image>
-        ${remotePoints.map((point) => `<path class="map-route-shadow map-route-fan" d="${route(point)}"></path>`).join("")}
-        ${remotePoints.map((point) => `<path class="map-route map-route-fan" d="${route(point)}"></path>`).join("")}
+        ${remotePoints.map((remote) => `<path class="map-route-shadow map-route-fan" d="${route(remote.point)}"></path>`).join("")}
+        ${remotePoints.map((remote) => `<path class="map-route map-route-fan" d="${route(remote.point)}"></path>`).join("")}
+        ${remotePoints.map((remote) => `
+          <circle class="map-pin b" cx="${remote.point.x.toFixed(1)}" cy="${remote.point.y.toFixed(1)}" r="9"></circle>
+          <text class="map-label" x="${labelX(remote.point).toFixed(1)}" y="${labelY(remote.point).toFixed(1)}">${escapeHtml(remote.country)}</text>
+        `).join("")}
         <circle class="map-pin a" cx="${aPoint.x.toFixed(1)}" cy="${aPoint.y.toFixed(1)}" r="12"></circle>
-        <text class="map-label" x="${labelX(aPoint).toFixed(1)}" y="${labelY(aPoint).toFixed(1)}">${a.name}</text>
-        <text class="map-label anywhere" x="1180" y="890">Anywhere</text>
+        <text class="map-label" x="${labelX(aPoint).toFixed(1)}" y="${labelY(aPoint).toFixed(1)}">${escapeHtml(a.name)}</text>
+        ${remotePoints.length ? "" : `<text class="map-label anywhere" x="980" y="890">No validated mapped DX for this filter</text>`}
       </svg>
     `;
     return;
@@ -517,8 +541,8 @@ function renderPathMap(a, b = null) {
       <path class="map-route" d="M ${aPoint.x.toFixed(1)} ${aPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${bPoint.x.toFixed(1)} ${bPoint.y.toFixed(1)}"></path>
       <circle class="map-pin a" cx="${aPoint.x.toFixed(1)}" cy="${aPoint.y.toFixed(1)}" r="12"></circle>
       <circle class="map-pin b" cx="${bPoint.x.toFixed(1)}" cy="${bPoint.y.toFixed(1)}" r="12"></circle>
-      <text class="map-label" x="${labelX(aPoint).toFixed(1)}" y="${labelY(aPoint).toFixed(1)}">${a.name}</text>
-      <text class="map-label" x="${labelX(bPoint).toFixed(1)}" y="${labelY(bPoint).toFixed(1)}">${b.name}</text>
+      <text class="map-label" x="${labelX(aPoint).toFixed(1)}" y="${labelY(aPoint).toFixed(1)}">${escapeHtml(a.name)}</text>
+      <text class="map-label" x="${labelX(bPoint).toFixed(1)}" y="${labelY(bPoint).toFixed(1)}">${escapeHtml(b.name)}</text>
     </svg>
   `;
 }
@@ -1358,7 +1382,9 @@ function renderBandChances(rows, minDistance = 0) {
 
 async function runLiveMap() {
   try {
+    suppressMapPreview = true;
     await resolvePathInput("a", false);
+    suppressMapPreview = false;
     const focus = readBox("a");
     const minutes = Math.min(60, Math.max(15, Number(els.liveWindow.value)));
     const minDistance = liveMinDistanceKm();
@@ -1377,6 +1403,10 @@ async function runLiveMap() {
         band,
         tx_sign,
         rx_sign,
+        tx_lat,
+        tx_lon,
+        rx_lat,
+        rx_lon,
         snr,
         power,
         round(${spotDistanceKmExpr}, 1) AS distance,
@@ -1410,6 +1440,7 @@ async function runLiveMap() {
     const [rows, totalRows] = await Promise.all([runQuery(sql), runQuery(totalSql)]);
     renderLiveMap(focus, rows, minutes, flow, minDistance, totalRows[0]);
   } catch (error) {
+    suppressMapPreview = false;
     els.liveMapMeta.textContent = "Live WSPR map";
     els.liveSummary.textContent = error.message;
     try {
@@ -1575,7 +1606,7 @@ async function run() {
     currentPathMinDistance = pathMinDistance;
     const summaryCandidates = await runQuery(summaryCandidateSqlFor(currentQueryContext, pathMinDistance));
     const summary = aggregateSummaryRows(summaryCandidates, currentQueryContext);
-    renderPathMap(a, b);
+    renderPathMap(a, b, summaryCandidates);
     renderHeatmap(summary);
     renderBandChances(summary, pathMinDistance);
     runLiveMap();
