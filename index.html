@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=38">
+  <link rel="stylesheet" href="styles.css?v=39">
 </head>
 <body>
   <main class="wrap">
@@ -160,19 +160,6 @@
       <ol class="slot-list" id="bandChanceList"></ol>
     </section>
 
-    <section class="card slotCard">
-      <div class="section-head">
-        <h2>Best Slots</h2>
-        <div class="card-filter">
-          <span>ranked by spot count</span>
-          <label for="slotMinDistance">Minimum distance (km)</label>
-          <input id="slotMinDistance" type="number" min="0" max="20040" step="100" value="0" inputmode="numeric" placeholder="0" aria-label="Best slots minimum distance in kilometres">
-          <button id="slotApplyBtn" type="button">Apply</button>
-        </div>
-      </div>
-      <ol class="slot-list" id="slotList"></ol>
-    </section>
-
     <section class="card liveMapCard">
       <div class="section-head live-head">
         <div>
@@ -246,6 +233,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=38"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>

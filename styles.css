@@ -299,9 +299,8 @@ fieldset {
   grid-column: span 12;
 }
 
-.slotCard,
 .bandCard {
-  grid-column: span 6;
+  grid-column: span 12;
 }
 
 .latestCard {
@@ -799,7 +798,6 @@ h2 {
   .liveMapCard,
   .rbnCard,
   .weatherCard,
-  .slotCard,
   .bandCard {
     grid-column: span 12;
   }

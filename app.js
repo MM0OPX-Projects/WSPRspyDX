@@ -164,12 +164,9 @@ const els = {
   liveCountries: document.querySelector("#liveCountries"),
   livePower: document.querySelector("#livePower"),
   liveSummary: document.querySelector("#liveSummary"),
-  slotList: document.querySelector("#slotList"),
   bandChanceList: document.querySelector("#bandChanceList"),
   bandMinDistance: document.querySelector("#bandMinDistance"),
   bandApplyBtn: document.querySelector("#bandApplyBtn"),
-  slotMinDistance: document.querySelector("#slotMinDistance"),
-  slotApplyBtn: document.querySelector("#slotApplyBtn"),
   queryMeta: document.querySelector("#queryMeta"),
   rbnCall: document.querySelector("#rbnCall"),
   rbnWindow: document.querySelector("#rbnWindow"),
@@ -1018,33 +1015,6 @@ function renderHeatmap(rows) {
   els.heatmap.innerHTML = body ? header + body : `<tr><td>No WSPR spots found for this path.</td></tr>`;
 }
 
-function renderSlots(rows, minDistance = 0) {
-  const byBand = new Map();
-  rows.forEach((row) => {
-    const band = Number(row.band);
-    const current = byBand.get(band) || { band, rows: [] };
-    current.rows.push(row);
-    byBand.set(band, current);
-  });
-  const slots = bands
-    .map((band) => byBand.get(band))
-    .filter(Boolean)
-    .map((data) => {
-      const allBest = [...data.rows].sort((a, b) => Number(b.spots) - Number(a.spots) || Number(b.best_snr) - Number(a.best_snr))[0];
-      return { band: data.band, allBest };
-    });
-  els.slotList.innerHTML = slots.length ? slots.map((slot) => `
-    <li>
-      <div class="slot-main">
-        <span>${bandLabel(slot.band)}</span>
-        <span>${Number(slot.allBest.spots).toLocaleString()}</span>
-      </div>
-      <div class="slot-sub">${minDistance ? `Minimum ${minDistance.toLocaleString()} km: ` : "All spots: "}${String(slot.allBest.hour).padStart(2, "0")}:00 UTC, avg SNR ${slot.allBest.avg_snr} dB, best ${slot.allBest.best_snr} dB, ${slot.allBest.tx_count} TX / ${slot.allBest.rx_count} RX stations</div>
-      <div class="mode-hint">${scaledText(slot.allBest.best_snr, slot.allBest.best_power)}</div>
-    </li>
-  `).join("") : `<li>No ranked slots yet.</li>`;
-}
-
 function renderBandChances(rows, minDistance = 0) {
   const byBand = new Map();
   rows.forEach((row) => {
@@ -1055,7 +1025,8 @@ function renderBandChances(rows, minDistance = 0) {
     byBand.set(band, current);
   });
 
-  const chances = [...byBand.entries()].map(([band, data]) => {
+  const chances = bands.filter((band) => band <= 28 && byBand.has(band)).map((band) => {
+    const data = byBand.get(band);
     const hourMap = new Map(data.rows.map((row) => [Number(row.hour), row]));
     let bestWindow = { start: 0, spots: -1, best: data.rows[0], snr100w: -Infinity, mode: 0 };
     for (let start = 0; start < 24; start += 1) {
@@ -1083,12 +1054,7 @@ function renderBandChances(rows, minDistance = 0) {
       snr100w: bestWindow.snr100w,
       mode: bestWindow.mode
     };
-  }).sort((a, b) =>
-    b.mode - a.mode ||
-    b.snr100w - a.snr100w ||
-    b.windowSpots - a.windowSpots ||
-    b.total - a.total
-  );
+  });
 
   els.bandChanceList.innerHTML = chances.length ? chances.map((chance) => `
     <li>
@@ -1201,20 +1167,6 @@ async function refreshBandChances() {
   }
 }
 
-async function refreshSlots() {
-  if (!currentQueryContext) return;
-  const minDistance = cleanDistanceInput(els.slotMinDistance);
-  els.slotApplyBtn.disabled = true;
-  try {
-    const rows = await runQuery(summarySqlFor(currentQueryContext, minDistance));
-    renderSlots(rows, minDistance);
-  } catch (error) {
-    els.slotList.innerHTML = `<li>${error.message}</li>`;
-  } finally {
-    els.slotApplyBtn.disabled = false;
-  }
-}
-
 async function run() {
   try {
     await resolveCurrentInputs(false);
@@ -1230,16 +1182,13 @@ async function run() {
 
     currentQueryContext = { a, b, days, where, since };
 
-    const slotMinDistance = cleanDistanceInput(els.slotMinDistance);
     const bandMinDistance = cleanDistanceInput(els.bandMinDistance);
-    const [summary, slotSummary, bandSummary] = await Promise.all([
+    const [summary, bandSummary] = await Promise.all([
       runQuery(summarySqlFor(currentQueryContext, 0)),
-      slotMinDistance ? runQuery(summarySqlFor(currentQueryContext, slotMinDistance)) : Promise.resolve(null),
       bandMinDistance ? runQuery(summarySqlFor(currentQueryContext, bandMinDistance)) : Promise.resolve(null)
     ]);
     renderPathMap(a, b);
     renderHeatmap(summary);
-    renderSlots(slotSummary || summary, slotMinDistance);
     renderBandChances(bandSummary || summary, bandMinDistance);
     runLiveMap();
     els.queryMeta.textContent = `${a.name} ↔ ${b.name}, ${days} days`;
@@ -1354,12 +1303,8 @@ document.addEventListener("click", (event) => {
 });
 els.runBtn.addEventListener("click", run);
 els.bandApplyBtn.addEventListener("click", refreshBandChances);
-els.slotApplyBtn.addEventListener("click", refreshSlots);
 els.bandMinDistance.addEventListener("keydown", (event) => {
   if (event.key === "Enter") refreshBandChances();
-});
-els.slotMinDistance.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") refreshSlots();
 });
 els.liveRefreshBtn.addEventListener("click", runLiveMap);
 els.liveWindow.addEventListener("change", runLiveMap);
