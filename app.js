@@ -256,6 +256,8 @@ let suppressMapPreview = false;
 let openBandDetailKey = null;
 let currentLiveRows = [];
 let openLiveDetailKey = null;
+let liveTouchGesture = null;
+let suppressLiveClickUntil = 0;
 const pathSettingsKey = "wsprspydx.pathSettings.v1";
 
 function normaliseName(value) {
@@ -693,6 +695,7 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
 function resetLiveDetailPanel() {
   openLiveDetailKey = null;
   if (!els.liveDetailPanel) return;
+  els.liveSummary.insertAdjacentElement("afterend", els.liveDetailPanel);
   els.liveDetailPanel.hidden = true;
   els.liveDetailTitle.textContent = "Select a hot band or country";
   els.liveDetailMeta.textContent = "Tap a tile to see its mapped live receptions.";
@@ -719,12 +722,15 @@ function showLiveOpeningDetails(kind, value, trigger) {
   );
   const pairs = summariseStationPairs(matchingRows);
   const label = kind === "band" ? bandLabel(value) : value;
+  trigger.insertAdjacentElement("afterend", els.liveDetailPanel);
   els.liveDetailPanel.hidden = false;
   els.liveDetailTitle.textContent = `${label} live openings`;
-  els.liveDetailMeta.textContent = `${matchingRows.length.toLocaleString()} mapped receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs. Sorted by longest distance first.`;
+  const displayedPairs = Math.min(50, pairs.length);
+  const limitText = pairs.length > displayedPairs ? ` Showing the top ${displayedPairs.toLocaleString()}.` : "";
+  els.liveDetailMeta.textContent = `${matchingRows.length.toLocaleString()} mapped receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs. Sorted by longest distance first.${limitText}`;
   els.liveDetailTable.innerHTML = pairs.length ? `
     <tr><th>Latest UTC</th><th>Band</th><th>TX</th><th>RX</th><th>Receptions</th><th>Countries</th><th>Max distance</th><th>Best SNR</th><th>Best 100W est</th><th>Mode</th></tr>
-    ${pairs.slice(0, 100).map((pair) => `
+    ${pairs.slice(0, 50).map((pair) => `
       <tr>
         <td>${formatSpotTime(pair.latestTime)}</td>
         <td>${[...pair.bands].sort((a, b) => a - b).map(bandLabel).join(", ")}</td>
@@ -1981,13 +1987,39 @@ function handleLiveDetailClick(event) {
   event.preventDefault();
   showLiveOpeningDetails(trigger.dataset.liveKind, trigger.dataset.liveValue, trigger);
 }
-els.liveBands.addEventListener("pointerdown", handleLiveDetailClick);
-els.liveCountries.addEventListener("pointerdown", handleLiveDetailClick);
-els.liveBands.addEventListener("click", (event) => {
-  if (event.detail === 0) handleLiveDetailClick(event);
-});
-els.liveCountries.addEventListener("click", (event) => {
-  if (event.detail === 0) handleLiveDetailClick(event);
+function startLiveTouch(event) {
+  if (event.pointerType !== "touch") return;
+  const trigger = event.target.closest(".live-detail-trigger");
+  liveTouchGesture = trigger ? { trigger, x: event.clientX, y: event.clientY, moved: false } : null;
+}
+function moveLiveTouch(event) {
+  if (!liveTouchGesture || event.pointerType !== "touch") return;
+  if (Math.hypot(event.clientX - liveTouchGesture.x, event.clientY - liveTouchGesture.y) > 10) {
+    liveTouchGesture.moved = true;
+  }
+}
+function finishLiveTouch(event) {
+  if (!liveTouchGesture || event.pointerType !== "touch") return;
+  const gesture = liveTouchGesture;
+  liveTouchGesture = null;
+  suppressLiveClickUntil = Date.now() + 500;
+  if (gesture.moved || !gesture.trigger.contains(event.target)) return;
+  event.preventDefault();
+  showLiveOpeningDetails(gesture.trigger.dataset.liveKind, gesture.trigger.dataset.liveValue, gesture.trigger);
+}
+function cancelLiveTouch() {
+  liveTouchGesture = null;
+}
+function handleLiveClick(event) {
+  if (Date.now() < suppressLiveClickUntil) return;
+  handleLiveDetailClick(event);
+}
+[els.liveBands, els.liveCountries].forEach((container) => {
+  container.addEventListener("pointerdown", startLiveTouch);
+  container.addEventListener("pointermove", moveLiveTouch);
+  container.addEventListener("pointerup", finishLiveTouch);
+  container.addEventListener("pointercancel", cancelLiveTouch);
+  container.addEventListener("click", handleLiveClick);
 });
 els.liveWindow.addEventListener("change", runLiveMap);
 els.liveDirection.addEventListener("change", runLiveMap);

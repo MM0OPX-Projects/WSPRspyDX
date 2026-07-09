@@ -413,6 +413,7 @@ h2 {
   font-family: inherit;
   text-align: left;
   cursor: pointer;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -420,6 +421,13 @@ h2 {
   border-color: var(--accent);
   background: rgba(73,167,255,.16);
   box-shadow: 0 0 0 2px rgba(73,167,255,.18);
+}
+
+.live-bands > .live-detail,
+.live-countries > .live-detail {
+  flex: 1 0 100%;
+  width: 100%;
+  margin: 2px 0 4px;
 }
 
 .live-band-chip span,
