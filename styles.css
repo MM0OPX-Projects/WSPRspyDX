@@ -408,6 +408,20 @@ h2 {
   font-weight: 900;
 }
 
+.live-band-chip,
+.live-country-chip {
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.live-detail-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: rgba(73,167,255,.16);
+  box-shadow: 0 0 0 2px rgba(73,167,255,.18);
+}
+
 .live-band-chip span,
 .live-country-chip span,
 .live-band-empty {
@@ -700,6 +714,13 @@ h2 {
   -webkit-overflow-scrolling: touch;
   padding-bottom: 4px;
   scrollbar-color: rgba(159,185,215,.55) rgba(255,255,255,.06);
+}
+
+.heatmap-note {
+  margin: 7px 2px 0;
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.35;
 }
 
 .heatmap {

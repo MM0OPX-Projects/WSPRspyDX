@@ -219,6 +219,10 @@ const els = {
   liveCountries: document.querySelector("#liveCountries"),
   livePower: document.querySelector("#livePower"),
   liveSummary: document.querySelector("#liveSummary"),
+  liveDetailPanel: document.querySelector("#liveDetailPanel"),
+  liveDetailTitle: document.querySelector("#liveDetailTitle"),
+  liveDetailMeta: document.querySelector("#liveDetailMeta"),
+  liveDetailTable: document.querySelector("#liveDetailTable"),
   bandDetailPanel: document.querySelector("#bandDetailPanel"),
   bandDetailTitle: document.querySelector("#bandDetailTitle"),
   bandDetailMeta: document.querySelector("#bandDetailMeta"),
@@ -250,6 +254,8 @@ let currentQueryContext = null;
 let currentPathMinDistance = 0;
 let suppressMapPreview = false;
 let openBandDetailKey = null;
+let currentLiveRows = [];
+let openLiveDetailKey = null;
 const pathSettingsKey = "wsprspydx.pathSettings.v1";
 
 function normaliseName(value) {
@@ -593,6 +599,8 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
     const workability = liveWorkability(row);
     return { ...row, remoteSign, remoteCountry: stationCountry(remoteSign, row.remote_lat, row.remote_lon) || "Unknown", ...workability };
   }).filter(hasUsableRemoteGeo);
+  currentLiveRows = enrichedRows;
+  resetLiveDetailPanel();
   const removedRows = rows.length - enrichedRows.length;
   const hotBands = [...enrichedRows.reduce((map, row) => {
     const band = Number(row.band);
@@ -652,16 +660,16 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
     : `${enrichedRows.length.toLocaleString()} mapped spots`;
   els.liveMapMeta.textContent = `${countText} ${flowText} ${focus.name}, last ${minutes} min${distanceText}`;
   els.liveBands.innerHTML = hotBands.length ? hotBands.map((band) => `
-    <span class="live-band-chip" style="--band-color:${bandColor(band.band)}">
+    <button type="button" class="live-band-chip live-detail-trigger" data-live-kind="band" data-live-value="${band.band}" style="--band-color:${bandColor(band.band)}" aria-expanded="false">
       <b>${bandLabel(band.band)}</b>
-      <span>${spotCountText(band.spots)} · ${compactModeLabel(band.bestRank)}</span>
-    </span>
+      <span>${spotCountText(band.spots)} &middot; ${compactModeLabel(band.bestRank)}</span>
+    </button>
   `).join("") : `<span class="live-band-empty">No hot bands in this window.</span>`;
   els.liveCountries.innerHTML = hotCountries.length ? hotCountries.map((item) => `
-    <span class="live-country-chip">
-      <b>${item.country}</b>
-      <span>${spotCountText(item.spots)} · ${compactModeLabel(item.bestRank)}</span>
-    </span>
+    <button type="button" class="live-country-chip live-detail-trigger" data-live-kind="country" data-live-value="${escapeHtml(item.country)}" aria-expanded="false">
+      <b>${escapeHtml(item.country)}</b>
+      <span>${spotCountText(item.spots)} &middot; ${compactModeLabel(item.bestRank)}</span>
+    </button>
   `).join("") : `<span class="live-band-empty">No hot countries in this window.</span>`;
   els.livePower.textContent = enrichedRows.length
     ? `100W estimate: ${workableRows.length.toLocaleString()} of ${enrichedRows.length.toLocaleString()} mapped spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
@@ -680,6 +688,57 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
       <text class="map-label" x="${Math.min(viewWidth - 240, Math.max(24, focusPoint.x + 18)).toFixed(1)}" y="${Math.min(viewHeight - 30, Math.max(36, focusPoint.y - 16)).toFixed(1)}">${focus.name}</text>
     </svg>
   `;
+}
+
+function resetLiveDetailPanel() {
+  openLiveDetailKey = null;
+  if (!els.liveDetailPanel) return;
+  els.liveDetailPanel.hidden = true;
+  els.liveDetailTitle.textContent = "Select a hot band or country";
+  els.liveDetailMeta.textContent = "Tap a tile to see its mapped live receptions.";
+  els.liveDetailTable.innerHTML = "";
+  document.querySelectorAll(".live-detail-trigger[aria-expanded='true']").forEach((button) => {
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+function showLiveOpeningDetails(kind, value, trigger) {
+  const detailKey = `${kind}:${value}`;
+  if (!els.liveDetailPanel) return;
+  if (!els.liveDetailPanel.hidden && openLiveDetailKey === detailKey) {
+    resetLiveDetailPanel();
+    return;
+  }
+
+  openLiveDetailKey = detailKey;
+  document.querySelectorAll(".live-detail-trigger").forEach((button) => {
+    button.setAttribute("aria-expanded", button === trigger ? "true" : "false");
+  });
+  const matchingRows = currentLiveRows.filter((row) =>
+    kind === "band" ? Number(row.band) === Number(value) : row.remoteCountry === value
+  );
+  const pairs = summariseStationPairs(matchingRows);
+  const label = kind === "band" ? bandLabel(value) : value;
+  els.liveDetailPanel.hidden = false;
+  els.liveDetailTitle.textContent = `${label} live openings`;
+  els.liveDetailMeta.textContent = `${matchingRows.length.toLocaleString()} mapped receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs. Sorted by longest distance first.`;
+  els.liveDetailTable.innerHTML = pairs.length ? `
+    <tr><th>Latest UTC</th><th>Band</th><th>TX</th><th>RX</th><th>Receptions</th><th>Countries</th><th>Max distance</th><th>Best SNR</th><th>Best 100W est</th><th>Mode</th></tr>
+    ${pairs.slice(0, 100).map((pair) => `
+      <tr>
+        <td>${formatSpotTime(pair.latestTime)}</td>
+        <td>${[...pair.bands].sort((a, b) => a - b).map(bandLabel).join(", ")}</td>
+        <td>${escapeHtml(pair.tx)}</td>
+        <td>${escapeHtml(pair.rx)}</td>
+        <td>${pair.count.toLocaleString()}</td>
+        <td>${[...pair.countries].slice(0, 3).map(escapeHtml).join("<br>")}${pair.countries.size > 3 ? "<br>..." : ""}</td>
+        <td>${Math.round(pair.maxDistance).toLocaleString()} km</td>
+        <td>${Number.isFinite(pair.bestSnr) ? pair.bestSnr.toFixed(0) : "n/a"} dB</td>
+        <td>${Number.isFinite(pair.best100w) ? `${pair.best100w >= 0 ? "+" : ""}${pair.best100w.toFixed(0)} dB` : "n/a"}</td>
+        <td>${compactModeLabel(pair.mode)}</td>
+      </tr>
+    `).join("")}
+  ` : "";
 }
 
 function rbnBandFromCode(code) {
@@ -1223,9 +1282,9 @@ function renderHeatmap(rows) {
     const cells = activeBands.map((band) => {
       const row = lookup.get(`${band}-${hour}`);
       const count = row ? Number(row.spots) : 0;
-      const title = row ? `${bandLabel(band)} ${hour}:00 UTC: ${count} spots, avg SNR ${row.avg_snr} dB` : "";
+      const title = row ? `${bandLabel(band)} ${hour}:00 UTC: ${count} WSPR database receptions, avg SNR ${row.avg_snr} dB` : "";
       const digitClass = count ? ` digits-${Math.min(6, String(count).length)}` : "";
-      return `<td class="${count ? "heatmap-cell" : ""}${digitClass}" data-band="${band}" data-hour="${hour}" title="${title}" style="background:${heatColor(count, max)}" tabindex="${count ? "0" : "-1"}"><span>${count || ""}</span></td>`;
+      return `<td class="${count ? "heatmap-cell" : ""}${digitClass}" data-band="${band}" data-hour="${hour}" data-receptions="${count}" title="${title}" style="background:${heatColor(count, max)}" tabindex="${count ? "0" : "-1"}"><span>${count || ""}</span></td>`;
     }).join("");
     return `<tr><th>${String(hour).padStart(2, "0")}</th>${cells}</tr>`;
   }).join("");
@@ -1490,7 +1549,7 @@ function bandSpotSqlFor(context, band, startHour, minDistance = 0, durationHours
         AND ${spotDistanceKmExpr} >= ${minDistance}
       GROUP BY band, tx_sign, rx_sign
       ORDER BY detail_distance DESC, spot_count DESC, (detail_snr + (50 - detail_power)) DESC, latest_time DESC
-      LIMIT 250`;
+       LIMIT 5000`;
 }
 
 function remoteCountryForSpot(row, context) {
@@ -1532,6 +1591,7 @@ function summariseStationPairs(rows) {
       tx,
       rx,
       count: 0,
+      bands: new Set(),
       countries: new Set(),
       maxDistance: 0,
       bestSnr: -Infinity,
@@ -1541,6 +1601,7 @@ function summariseStationPairs(rows) {
       latestValue: 0
     };
     current.count += Number(row.spot_count) || 1;
+    current.bands.add(Number(row.band));
     current.countries.add(`${row.txCountry} to ${row.rxCountry}`);
     current.maxDistance = Math.max(current.maxDistance, Number(row.distance) || 0);
     current.bestSnr = Math.max(current.bestSnr, Number(row.snr) || -Infinity);
@@ -1617,18 +1678,22 @@ function renderBandSpotDetails(band, startHour, rows, minDistance, durationHours
   ` : "";
 }
 
-function renderBandPairDetails(band, startHour, rows, minDistance, durationHours = 1) {
+function renderBandPairDetails(band, startHour, rows, minDistance, durationHours = 1, databaseCount = 0) {
   const endHour = (Number(startHour) + Number(durationHours)) % 24;
   const windowText = `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:00 UTC`;
   const pairs = summariseStationPairs(rows);
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots, ${windowText}`;
   const receptionCount = pairs.reduce((sum, pair) => sum + pair.count, 0);
-  els.bandDetailMeta.textContent = `${receptionCount.toLocaleString()} receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. Sorted by longest distance first.`;
+  const rejectedCount = Math.max(0, Number(databaseCount) - receptionCount);
+  const validationText = databaseCount
+    ? `${Number(databaseCount).toLocaleString()} database receptions in the UTC cell; ${receptionCount.toLocaleString()} have confirmed station geography`
+    : `${receptionCount.toLocaleString()} receptions have confirmed station geography`;
+  els.bandDetailMeta.textContent = `${validationText}, compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${rejectedCount ? ` (${rejectedCount.toLocaleString()} excluded because callsign and location did not agree)` : ""}${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. Sorted by longest distance first.`;
   const countries = [...rows.reduce((map, row) => {
     const country = remoteCountryForSpot(row, currentQueryContext);
     const snr100w = scaledSnr(row.snr, row.power);
     const current = map.get(country) || { country, spots: 0, best: -Infinity, mode: 0 };
-    current.spots += 1;
+    current.spots += Number(row.spot_count) || 1;
     current.best = Math.max(current.best, snr100w);
     current.mode = Math.max(current.mode, modeRank(snr100w));
     map.set(country, current);
@@ -1658,7 +1723,7 @@ function renderBandPairDetails(band, startHour, rows, minDistance, durationHours
   ` : "";
 }
 
-async function showUtcWindowDetails(band, startHour) {
+async function showUtcWindowDetails(band, startHour, databaseCount = 0) {
   if (!currentQueryContext) return;
   const detailKey = `${Number(band)}-${Number(startHour)}`;
   const panel = ensureBandDetailPanel();
@@ -1677,7 +1742,7 @@ async function showUtcWindowDetails(band, startHour) {
   try {
     const rows = await runQuery(bandSpotSqlFor(currentQueryContext, band, startHour, minDistance, 1));
     const cleanRows = rows.map(normaliseDetailSpot).map((row) => validatedPathSpot(row, currentQueryContext)).filter(Boolean);
-    renderBandPairDetails(band, startHour, cleanRows, minDistance, 1);
+    renderBandPairDetails(band, startHour, cleanRows, minDistance, 1, databaseCount);
   } catch (error) {
     els.bandDetailTitle.textContent = `${bandLabel(band)} spot detail unavailable`;
     els.bandDetailMeta.textContent = error.message;
@@ -1870,13 +1935,19 @@ els.bCountry.addEventListener("change", () => {
   savePathSettings();
   resolvePathInput("b");
 });
-els.aSuggestions.addEventListener("click", (event) => {
+function chooseSuggestionFromEvent(event, prefix) {
   const button = event.target.closest("button");
-  if (button) chooseSuggestion("a", button.dataset.name);
+  if (!button) return;
+  event.preventDefault();
+  chooseSuggestion(prefix, button.dataset.name);
+}
+els.aSuggestions.addEventListener("pointerdown", (event) => chooseSuggestionFromEvent(event, "a"));
+els.bSuggestions.addEventListener("pointerdown", (event) => chooseSuggestionFromEvent(event, "b"));
+els.aSuggestions.addEventListener("click", (event) => {
+  if (event.detail === 0) chooseSuggestionFromEvent(event, "a");
 });
 els.bSuggestions.addEventListener("click", (event) => {
-  const button = event.target.closest("button");
-  if (button) chooseSuggestion("b", button.dataset.name);
+  if (event.detail === 0) chooseSuggestionFromEvent(event, "b");
 });
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".combo")) {
@@ -1888,14 +1959,14 @@ els.runBtn.addEventListener("click", run);
 els.heatmap.addEventListener("click", (event) => {
   const cell = event.target.closest(".heatmap-cell");
   if (!cell) return;
-  showUtcWindowDetails(Number(cell.dataset.band), Number(cell.dataset.hour));
+  showUtcWindowDetails(Number(cell.dataset.band), Number(cell.dataset.hour), Number(cell.dataset.receptions));
 });
 els.heatmap.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== " ") return;
   const cell = event.target.closest(".heatmap-cell");
   if (!cell) return;
   event.preventDefault();
-  showUtcWindowDetails(Number(cell.dataset.band), Number(cell.dataset.hour));
+  showUtcWindowDetails(Number(cell.dataset.band), Number(cell.dataset.hour), Number(cell.dataset.receptions));
 });
 els.pathMinDistance.addEventListener("keydown", (event) => {
   if (event.key === "Enter") run();
@@ -1904,6 +1975,20 @@ els.period.addEventListener("change", savePathSettings);
 els.direction.addEventListener("change", savePathSettings);
 els.pathMinDistance.addEventListener("change", savePathSettings);
 els.liveRefreshBtn.addEventListener("click", runLiveMap);
+function handleLiveDetailClick(event) {
+  const trigger = event.target.closest(".live-detail-trigger");
+  if (!trigger) return;
+  event.preventDefault();
+  showLiveOpeningDetails(trigger.dataset.liveKind, trigger.dataset.liveValue, trigger);
+}
+els.liveBands.addEventListener("pointerdown", handleLiveDetailClick);
+els.liveCountries.addEventListener("pointerdown", handleLiveDetailClick);
+els.liveBands.addEventListener("click", (event) => {
+  if (event.detail === 0) handleLiveDetailClick(event);
+});
+els.liveCountries.addEventListener("click", (event) => {
+  if (event.detail === 0) handleLiveDetailClick(event);
+});
 els.liveWindow.addEventListener("change", runLiveMap);
 els.liveDirection.addEventListener("change", runLiveMap);
 els.liveMinDistance.addEventListener("change", runLiveMap);
