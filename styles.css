@@ -418,23 +418,6 @@ h2 {
   grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) minmax(128px, auto) minmax(76px, 120px) minmax(110px, 140px);
 }
 
-.rbn-html-note {
-  max-width: 620px;
-  margin: 7px 0 0;
-  padding: 8px 10px;
-  border-left: 4px solid var(--warn);
-  border-radius: 6px;
-  background: rgba(246,201,69,.1);
-  color: #f5d979;
-  font-size: .78rem;
-  font-weight: 800;
-  line-height: 1.4;
-}
-
-.rbn-html-note[hidden] {
-  display: none;
-}
-
 .live-bands,
 .live-countries {
   display: flex;

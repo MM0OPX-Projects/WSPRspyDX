@@ -5,8 +5,8 @@ WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagatio
 The project is available in three formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
-- **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR, NOAA and RBN data.
-- **Android APK**: `releases/WSPRSpyDX-v0.44-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
+- **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR and NOAA data. The CW RBN Monitor is available only in the Android app.
+- **Android APK**: `releases/WSPRSpyDX-v0.45-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
 
 ## Features
 
@@ -92,7 +92,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.44-debug.apk
+releases/WSPRSpyDX-v0.45-debug.apk
 ```
 
 To install it on Android:
@@ -131,7 +131,7 @@ The current test APK was built locally from this wrapper and the dashboard asset
 |   `-- build-standalone.ps1
 |-- android-apk/
 `-- releases/
-    `-- WSPRSpyDX-v0.44-debug.apk
+    `-- WSPRSpyDX-v0.45-debug.apk
 ```
 
 ## Notes

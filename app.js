@@ -237,8 +237,8 @@ const els = {
   rbnDistanceMode: document.querySelector("#rbnDistanceMode"),
   rbnMinDistance: document.querySelector("#rbnMinDistance"),
   rbnRunBtn: document.querySelector("#rbnRunBtn"),
+  rbnCard: document.querySelector("#rbnCard"),
   rbnMeta: document.querySelector("#rbnMeta"),
-  rbnHtmlNote: document.querySelector("#rbnHtmlNote"),
   rbnMap: document.querySelector("#rbnMap"),
   rbnTable: document.querySelector("#rbnTable"),
   rbnSummary: document.querySelector("#rbnSummary"),
@@ -2075,7 +2075,11 @@ if ("serviceWorker" in navigator) {
 }
 
 const hasSavedPathSettings = restorePathSettings();
-els.rbnHtmlNote.hidden = navigator.userAgent.includes("WSPRSpyDX-Android");
+if (navigator.userAgent.includes("WSPRSpyDX-Android")) {
+  els.rbnCard.hidden = false;
+} else {
+  els.rbnCard.remove();
+}
 setDistanceMode(els.pathDistanceMode, els.pathDistanceMode.value);
 setDistanceMode(els.liveDistanceMode, els.liveDistanceMode.value);
 setDistanceMode(els.rbnDistanceMode, els.rbnDistanceMode.value);

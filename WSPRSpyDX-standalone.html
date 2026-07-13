@@ -431,23 +431,6 @@ h2 {
   grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) minmax(128px, auto) minmax(76px, 120px) minmax(110px, 140px);
 }
 
-.rbn-html-note {
-  max-width: 620px;
-  margin: 7px 0 0;
-  padding: 8px 10px;
-  border-left: 4px solid var(--warn);
-  border-radius: 6px;
-  background: rgba(246,201,69,.1);
-  color: #f5d979;
-  font-size: .78rem;
-  font-weight: 800;
-  line-height: 1.4;
-}
-
-.rbn-html-note[hidden] {
-  display: none;
-}
-
 .live-bands,
 .live-countries {
   display: flex;
@@ -1363,12 +1346,11 @@ h2 {
       </div>
     </section>
 
-    <section class="card rbnCard">
+    <section class="card rbnCard" id="rbnCard" hidden>
       <div class="section-head live-head">
         <div>
           <h2>CW RBN Monitor</h2>
           <span id="rbnMeta">Reverse Beacon Network spot lookup</span>
-          <p class="rbn-html-note" id="rbnHtmlNote" hidden>RBN monitoring works only in the Android app. Browser security restrictions block the direct RBN feed in the HTML version.</p>
         </div>
         <div class="live-controls rbn-controls">
           <label for="rbnCall">Call</label>
@@ -1646,8 +1628,8 @@ const els = {
   rbnDistanceMode: document.querySelector("#rbnDistanceMode"),
   rbnMinDistance: document.querySelector("#rbnMinDistance"),
   rbnRunBtn: document.querySelector("#rbnRunBtn"),
+  rbnCard: document.querySelector("#rbnCard"),
   rbnMeta: document.querySelector("#rbnMeta"),
-  rbnHtmlNote: document.querySelector("#rbnHtmlNote"),
   rbnMap: document.querySelector("#rbnMap"),
   rbnTable: document.querySelector("#rbnTable"),
   rbnSummary: document.querySelector("#rbnSummary"),
@@ -3482,7 +3464,11 @@ els.refreshBtn.addEventListener("click", () => {
 
 
 const hasSavedPathSettings = restorePathSettings();
-els.rbnHtmlNote.hidden = navigator.userAgent.includes("WSPRSpyDX-Android");
+if (navigator.userAgent.includes("WSPRSpyDX-Android")) {
+  els.rbnCard.hidden = false;
+} else {
+  els.rbnCard.remove();
+}
 setDistanceMode(els.pathDistanceMode, els.pathDistanceMode.value);
 setDistanceMode(els.liveDistanceMode, els.liveDistanceMode.value);
 setDistanceMode(els.rbnDistanceMode, els.rbnDistanceMode.value);
