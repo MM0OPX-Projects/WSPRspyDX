@@ -4,7 +4,7 @@ WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagatio
 
 The project is available in three formats:
 
-- **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
+- **HTML/PWA dashboard**: [open WSPRSpyDX on GitHub Pages](https://mm0opx-projects.github.io/WSPRSpyDX/). This is the recommended version for iPhone and iPad.
 - **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR and NOAA data. The CW RBN Monitor is available only in the Android app.
 - **Android APK**: `releases/WSPRSpyDX-v0.53-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
 
@@ -77,15 +77,15 @@ This creates `WSPRSpyDX-standalone.html`. It can be opened directly or uploaded 
 
 ## Publish With GitHub Pages
 
-After pushing this repository to GitHub:
+The live HTML dashboard is published at:
 
-1. Open the repository on GitHub.
-2. Go to **Settings > Pages**.
-3. Set **Source** to **Deploy from a branch**.
-4. Select branch `main` and folder `/root`.
-5. Save.
+```text
+https://mm0opx-projects.github.io/WSPRSpyDX/
+```
 
-GitHub will provide a public URL for the HTML dashboard.
+The workflow in `.github/workflows/pages.yml` republishes the site after changes to `main`.
+
+On iPhone or iPad, open the GitHub Pages URL in Safari. Do not open the `raw.githubusercontent.com` file link: GitHub deliberately serves raw repository HTML as plain text, so Safari will not execute it as a website.
 
 ## Install The Android APK
 
