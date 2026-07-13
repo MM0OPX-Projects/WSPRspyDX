@@ -286,7 +286,7 @@ function spotCountText(count) {
 }
 
 function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
@@ -318,7 +318,7 @@ function countryFromCoords(lat, lon) {
     pointLon >= box.lonMin &&
     pointLon <= box.lonMax
   );
-  return match?.name || "Unknown";
+  return match ? match.name : "Unknown";
 }
 
 function callsignMatchesCoords(country, lat, lon) {
@@ -347,7 +347,7 @@ function validatedSpot(row) {
 }
 
 function expectedCountryForRegion(region) {
-  return countryGeoBoxes.some((box) => box.name === region?.name) ? region.name : null;
+  return countryGeoBoxes.some((box) => box.name === (region && region.name)) ? region.name : null;
 }
 
 function validatedPathSpot(row, context) {
@@ -392,8 +392,8 @@ function fillBox(prefix, box) {
   const boxes = box.boxes || [box];
   const bounds = boundingBox(boxes);
   els[`${prefix}Name`].value = box.name;
-  els[`${prefix}Name`].dataset.lat = box.lat ?? "";
-  els[`${prefix}Name`].dataset.lon = box.lon ?? "";
+  els[`${prefix}Name`].dataset.lat = box.lat == null ? "" : box.lat;
+  els[`${prefix}Name`].dataset.lon = box.lon == null ? "" : box.lon;
   els[`${prefix}Name`].dataset.boxes = JSON.stringify(boxes);
   els[`${prefix}LatMin`].value = bounds.latMin;
   els[`${prefix}LatMax`].value = bounds.latMax;
@@ -406,7 +406,7 @@ function pointInRegion(lat, lon, box) {
   const pointLat = Number(lat);
   const pointLon = Number(lon);
   if (!Number.isFinite(pointLat) || !Number.isFinite(pointLon) || !box) return false;
-  const boxes = box.boxes?.length ? box.boxes : [box];
+  const boxes = box.boxes && box.boxes.length ? box.boxes : [box];
   return boxes.some((part) =>
     pointLat >= Number(part.latMin) &&
     pointLat <= Number(part.latMax) &&
@@ -573,7 +573,7 @@ function cleanDistanceMode(value) {
 }
 
 function distanceModeFor(input) {
-  return cleanDistanceMode(input?.value);
+  return cleanDistanceMode(input && input.value);
 }
 
 function distanceSql(mode, value) {
@@ -615,7 +615,7 @@ function renderLiveMap(focus, rows, minutes, flow, distanceFilter = 0, distanceM
   const viewWidth = 1536;
   const viewHeight = 1024;
   const focusPoint = mapProject(boxCenter(focus));
-  const totalSpots = Number(totals?.spots ?? rows.length);
+  const totalSpots = Number(totals && totals.spots != null ? totals.spots : rows.length);
   const pathContext = { a: focus, b: null };
   const enrichedRows = rows.map((row) => validatedPathSpot(row, pathContext)).filter(Boolean).map((row) => {
     const remoteSign = row.flow === "sent" ? row.rx_sign : row.tx_sign;
@@ -894,7 +894,7 @@ function renderRbnTable(spots) {
 let rbnTimer;
 
 async function fetchRbnJson(url) {
-  if (window.AndroidRbn?.fetchRbn) {
+  if (window.AndroidRbn && typeof window.AndroidRbn.fetchRbn === "function") {
     const raw = String(window.AndroidRbn.fetchRbn(url) || "");
     const splitAt = raw.indexOf("\n");
     const status = Number(splitAt >= 0 ? raw.slice(0, splitAt) : 0);
@@ -922,13 +922,13 @@ async function requestRbnPayload(params) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     params.set("h", rbnVersionHash);
     const result = await fetchRbnJson(`${rbnEndpoint}?${params.toString()}`);
-    const serverHash = String(result.payload?.ver_h || "").trim();
+    const serverHash = String(result.payload && result.payload.ver_h || "").trim();
     if (serverHash && serverHash !== rbnVersionHash && attempt === 0) {
       rbnVersionHash = serverHash;
       continue;
     }
     if (!result.ok) {
-      const errorCode = result.payload?.error ? `, error ${result.payload.error}` : "";
+      const errorCode = result.payload && result.payload.error ? `, error ${result.payload.error}` : "";
       throw new Error(`RBN returned HTTP ${result.status}${errorCode}`);
     }
     return result.payload;
@@ -1064,7 +1064,8 @@ function fallbackZoneBox(kind, zone) {
 function parseZones(value, kind) {
   const max = kind === "cq" ? 40 : 90;
   const specials = kind === "cq" ? specialCqZones : specialItuZones;
-  const zones = [...new Set(String(value).match(/\d+/g)?.map(Number) || [])].filter((zone) => zone >= 1 && zone <= max);
+  const zoneMatches = String(value).match(/\d+/g);
+  const zones = [...new Set(zoneMatches ? zoneMatches.map(Number) : [])].filter((zone) => zone >= 1 && zone <= max);
   if (!zones.length) throw new Error(`Enter one or more ${kind.toUpperCase()} zone numbers, for example 14 or 1,2.`);
   const boxes = zones.map((zone) => specials[zone] || fallbackZoneBox(kind, zone));
   const bounds = boundingBox(boxes);
@@ -1131,7 +1132,7 @@ function parseLocators(value) {
 
 function boxFromResult(result) {
   const [latMin, latMax, lonMin, lonMax] = result.boundingbox.map(Number);
-  const name = result.address?.country || result.address?.state || result.name || result.display_name;
+  const name = result.address && (result.address.country || result.address.state) || result.name || result.display_name;
   return { name, lat: Number(result.lat), lon: Number(result.lon), latMin, latMax, lonMin, lonMax };
 }
 
@@ -1191,7 +1192,7 @@ async function lookupRegion(value) {
     .sort((a, b) => resultScore(b, query) - resultScore(a, query))
     .map((result) => ({
       box: boxFromResult(result),
-      label: result.address?.country || result.address?.state || result.display_name
+      label: result.address && (result.address.country || result.address.state) || result.display_name
     }));
   geocodeCache.set(query, matches);
   return matches;
@@ -1268,7 +1269,7 @@ function readBox(prefix) {
 }
 
 function regionWhere(prefix, box) {
-  const boxes = box.boxes?.length ? box.boxes : [box];
+  const boxes = box.boxes && box.boxes.length ? box.boxes : [box];
   return `(${boxes.map((part) => `${prefix}_lat BETWEEN ${part.latMin} AND ${part.latMax} AND ${prefix}_lon BETWEEN ${part.lonMin} AND ${part.lonMax}`).join(" OR ")})`;
 }
 
@@ -1615,7 +1616,7 @@ function bandSpotSqlFor(context, band, startHour, minDistance = 0, durationHours
 }
 
 function remoteCountryForSpot(row, context) {
-  if (!context?.b) {
+  if (context && !context.b) {
     const txInA = pointInRegion(row.tx_lat, row.tx_lon, context.a);
     const rxInA = pointInRegion(row.rx_lat, row.rx_lon, context.a);
     if (txInA && !rxInA) return row.rxCountry;
@@ -1687,13 +1688,13 @@ function normaliseDetailSpot(row) {
   return {
     ...row,
     time: row.latest_time || row.time,
-    tx_lat: row.detail_tx_lat ?? row.tx_lat,
-    tx_lon: row.detail_tx_lon ?? row.tx_lon,
-    rx_lat: row.detail_rx_lat ?? row.rx_lat,
-    rx_lon: row.detail_rx_lon ?? row.rx_lon,
-    distance: row.detail_distance ?? row.distance,
-    snr: row.detail_snr ?? row.snr,
-    power: row.detail_power ?? row.power
+    tx_lat: row.detail_tx_lat == null ? row.tx_lat : row.detail_tx_lat,
+    tx_lon: row.detail_tx_lon == null ? row.tx_lon : row.detail_tx_lon,
+    rx_lat: row.detail_rx_lat == null ? row.rx_lat : row.detail_rx_lat,
+    rx_lon: row.detail_rx_lon == null ? row.rx_lon : row.detail_rx_lon,
+    distance: row.detail_distance == null ? row.distance : row.detail_distance,
+    snr: row.detail_snr == null ? row.snr : row.detail_snr,
+    power: row.detail_power == null ? row.power : row.detail_power
   };
 }
 
@@ -1792,7 +1793,7 @@ function renderUtcPairTable(pairs) {
 }
 
 function placeUtcPairTable(trigger = null) {
-  const wrapper = els.bandSpotTable?.closest(".rbn-table-wrap");
+  const wrapper = els.bandSpotTable ? els.bandSpotTable.closest(".rbn-table-wrap") : null;
   if (!wrapper || !els.bandCountrySummary) return;
   if (trigger) trigger.insertAdjacentElement("afterend", wrapper);
   else els.bandCountrySummary.insertAdjacentElement("afterend", wrapper);

@@ -1084,7 +1084,9 @@ h2 {
   }
 
   .path-map {
+    width: 100%;
     min-height: 205px;
+    aspect-ratio: auto;
     border-radius: 14px;
   }
 
