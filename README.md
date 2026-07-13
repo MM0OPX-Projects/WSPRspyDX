@@ -2,9 +2,10 @@
 
 WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagation between two countries, regions, zones, locators, or from one region to anywhere. It is aimed at quick phone use: choose Region A, optionally choose Region B, pick a history window, then use the spot counts, band summaries, UTC windows, and signal estimates to judge whether a path is worth trying.
 
-The project is available in two formats:
+The project is available in three formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
+- **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR, NOAA and RBN data.
 - **Android APK**: `releases/WSPRSpyDX-v0.43-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
 
 ## Features
@@ -64,6 +65,16 @@ http://YOUR-COMPUTER-LAN-IP:8790/
 
 In Chrome on Android, use **Add to Home screen** to install it like a small app.
 
+## Build The Single-File HTML Version
+
+The checked-in standalone file can be regenerated after dashboard changes with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\build-standalone.ps1
+```
+
+This creates `WSPRSpyDX-standalone.html`. It can be opened directly or uploaded as one HTML file. An internet connection is still needed for the external radio and space-weather data sources.
+
 ## Publish With GitHub Pages
 
 After pushing this repository to GitHub:
@@ -109,12 +120,15 @@ The current test APK was built locally from this wrapper and the dashboard asset
 ```text
 .
 |-- index.html
+|-- WSPRSpyDX-standalone.html
 |-- app.js
 |-- styles.css
 |-- manifest.webmanifest
 |-- sw.js
 |-- icon.svg
 |-- world-map.png
+|-- tools/
+|   `-- build-standalone.ps1
 |-- android-apk/
 `-- releases/
     `-- WSPRSpyDX-v0.43-debug.apk
