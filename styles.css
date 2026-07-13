@@ -406,6 +406,8 @@ h2 {
   font-size: .7rem;
   font-weight: 900;
   cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .distance-toggle .distance-mode-button.active {
@@ -917,6 +919,32 @@ h2 {
   color: #bad4ef;
 }
 
+@media (max-width: 1400px) {
+  .live-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .live-controls {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    grid-template-columns: max-content minmax(0, 1fr);
+    margin-top: 10px;
+  }
+
+  .live-controls > label {
+    white-space: nowrap;
+  }
+
+  .live-controls > button {
+    grid-column: 1 / -1;
+  }
+
+  .live-controls .distance-toggle button {
+    grid-column: auto;
+  }
+}
+
 @media (max-width: 900px) {
   .selectors,
   .box-editor {
@@ -950,22 +978,8 @@ h2 {
     display: grid;
   }
 
-  .live-controls {
-    width: 100%;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 10px;
-  }
-
-  .live-controls button {
-    grid-column: 1 / -1;
-  }
-
-  .live-controls .distance-toggle button {
-    grid-column: auto;
-  }
-
   .rbn-controls {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: max-content minmax(0, 1fr);
   }
 
   .card-filter {
