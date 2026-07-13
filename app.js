@@ -1667,7 +1667,9 @@ function renderBandPairDetails(band, startHour, rows, minDistance, durationHours
   const pairs = summariseStationPairs(rows);
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots, ${windowText}`;
   const receptionCount = pairs.reduce((sum, pair) => sum + pair.count, 0);
-  els.bandDetailMeta.textContent = `${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. This is the same validated reception count shown in the UTC cell. Sorted by longest distance first.`;
+  const displayedPairs = Math.min(50, pairs.length);
+  const limitText = pairs.length > displayedPairs ? ` Showing the top ${displayedPairs.toLocaleString()} pairs.` : "";
+  els.bandDetailMeta.textContent = `${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. This is the same validated reception count shown in the UTC cell. Sorted by longest distance first.${limitText}`;
   const countries = [...rows.reduce((map, row) => {
     const country = remoteCountryForSpot(row, currentQueryContext);
     const snr100w = scaledSnr(row.snr, row.power);
@@ -1686,7 +1688,7 @@ function renderBandPairDetails(band, startHour, rows, minDistance, durationHours
   `).join("") : `<span class="live-band-empty">No country summary for this window.</span>`;
   els.bandSpotTable.innerHTML = pairs.length ? `
     <tr><th>Latest UTC</th><th>TX</th><th>RX</th><th>Receptions</th><th>Countries</th><th>Max distance</th><th>Best SNR</th><th>Best 100W est</th><th>Mode</th></tr>
-    ${pairs.slice(0, 100).map((pair) => `
+    ${pairs.slice(0, 50).map((pair) => `
       <tr>
         <td>${formatSpotTime(pair.latestTime)}</td>
         <td>${escapeHtml(pair.tx)}</td>
