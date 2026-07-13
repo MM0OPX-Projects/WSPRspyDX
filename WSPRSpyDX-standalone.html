@@ -929,6 +929,12 @@ h2 {
   margin: 10px 0 4px;
 }
 
+.band-country-summary > .rbn-table-wrap {
+  flex: 1 0 100%;
+  width: 100%;
+  margin: 4px 0 8px;
+}
+
 .slot-main,
 .spot-main {
   display: flex;
@@ -2853,6 +2859,7 @@ function ensureBandDetailPanel() {
 
 function resetBandDetailPanel() {
   const panel = ensureBandDetailPanel();
+  placeUtcPairTable();
   openBandDetailKey = null;
   openBandCountry = null;
   currentBandDetailState = null;
@@ -3153,6 +3160,7 @@ function renderBandSpotDetails(band, startHour, rows, minDistance, durationHours
 }
 
 function renderBandPairDetails(band, startHour, rows, distanceFilter, distanceMode = "min", durationHours = 1, databaseCount = 0) {
+  placeUtcPairTable();
   const endHour = (Number(startHour) + Number(durationHours)) % 24;
   const windowText = `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:00 UTC`;
   const pairs = summariseStationPairs(rows);
@@ -3202,7 +3210,14 @@ function renderUtcPairTable(pairs) {
   ` : "";
 }
 
-function toggleUtcCountryDetails(country) {
+function placeUtcPairTable(trigger = null) {
+  const wrapper = els.bandSpotTable?.closest(".rbn-table-wrap");
+  if (!wrapper || !els.bandCountrySummary) return;
+  if (trigger) trigger.insertAdjacentElement("afterend", wrapper);
+  else els.bandCountrySummary.insertAdjacentElement("afterend", wrapper);
+}
+
+function toggleUtcCountryDetails(country, trigger) {
   if (!currentBandDetailState) return;
   openBandCountry = openBandCountry === country ? null : country;
   const rows = openBandCountry
@@ -3214,9 +3229,11 @@ function toggleUtcCountryDetails(country) {
     button.setAttribute("aria-expanded", String(button.dataset.utcCountry === openBandCountry));
   });
   if (openBandCountry) {
+    placeUtcPairTable(trigger);
     const shown = Math.min(50, pairs.length);
     els.bandDetailMeta.textContent = `${openBandCountry}: ${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs. Sorted by longest distance first.${pairs.length > shown ? ` Showing the top ${shown.toLocaleString()} pairs.` : ""}`;
   } else {
+    placeUtcPairTable();
     els.bandDetailMeta.textContent = currentBandDetailState.baseMeta;
   }
   renderUtcPairTable(pairs);
@@ -3535,7 +3552,7 @@ function handleLiveClick(event) {
 });
 els.bandCountrySummary.addEventListener("click", (event) => {
   const button = event.target.closest("[data-utc-country]");
-  if (button) toggleUtcCountryDetails(button.dataset.utcCountry);
+  if (button) toggleUtcCountryDetails(button.dataset.utcCountry, button);
 });
 els.liveWindow.addEventListener("change", runLiveMap);
 els.liveDirection.addEventListener("change", runLiveMap);

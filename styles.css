@@ -916,6 +916,12 @@ h2 {
   margin: 10px 0 4px;
 }
 
+.band-country-summary > .rbn-table-wrap {
+  flex: 1 0 100%;
+  width: 100%;
+  margin: 4px 0 8px;
+}
+
 .slot-main,
 .spot-main {
   display: flex;
