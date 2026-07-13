@@ -1211,7 +1211,10 @@ function renderCountryOptions(prefix, matches) {
 async function resolveCountry(prefix, shouldReport = true) {
   const input = els[`${prefix}Country`];
   const value = input.value.trim();
-  if (value.length < 3) return;
+  if (value.length < 2) {
+    renderCountryOptions(prefix, []);
+    return;
+  }
 
   try {
     const matches = await lookupRegion(value);
@@ -2021,6 +2024,12 @@ els.aCountry.addEventListener("input", () => {
     try { resolveStructuredInput("a", false); } catch (error) {}
   }
 });
+els.aCountry.addEventListener("compositionend", () => scheduleCountryLookup("a"));
+els.bCountry.addEventListener("compositionend", () => scheduleCountryLookup("b"));
+els.aCountry.addEventListener("keyup", () => scheduleCountryLookup("a"));
+els.bCountry.addEventListener("keyup", () => {
+  if (!isAnywhereTarget("b")) scheduleCountryLookup("b");
+});
 els.bCountry.addEventListener("input", () => {
   savePathSettings();
   if (isAnywhereTarget("b")) {
@@ -2048,14 +2057,10 @@ function chooseSuggestionFromEvent(event, prefix) {
   event.preventDefault();
   chooseSuggestion(prefix, button.dataset.name);
 }
-els.aSuggestions.addEventListener("pointerdown", (event) => chooseSuggestionFromEvent(event, "a"));
-els.bSuggestions.addEventListener("pointerdown", (event) => chooseSuggestionFromEvent(event, "b"));
-els.aSuggestions.addEventListener("click", (event) => {
-  if (event.detail === 0) chooseSuggestionFromEvent(event, "a");
-});
-els.bSuggestions.addEventListener("click", (event) => {
-  if (event.detail === 0) chooseSuggestionFromEvent(event, "b");
-});
+els.aSuggestions.addEventListener("click", (event) => chooseSuggestionFromEvent(event, "a"));
+els.bSuggestions.addEventListener("click", (event) => chooseSuggestionFromEvent(event, "b"));
+els.aSuggestions.addEventListener("touchend", (event) => chooseSuggestionFromEvent(event, "a"), { passive: false });
+els.bSuggestions.addEventListener("touchend", (event) => chooseSuggestionFromEvent(event, "b"), { passive: false });
 document.addEventListener("click", (event) => {
   if (!event.target.closest(".combo")) {
     els.aSuggestions.classList.remove("open");
