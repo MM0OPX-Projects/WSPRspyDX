@@ -199,6 +199,7 @@ const els = {
   direction: document.querySelector("#direction"),
   liveWindow: document.querySelector("#liveWindow"),
   liveDirection: document.querySelector("#liveDirection"),
+  liveDistanceMode: document.querySelector("#liveDistanceMode"),
   liveMinDistance: document.querySelector("#liveMinDistance"),
   liveRefreshBtn: document.querySelector("#liveRefreshBtn"),
   refreshBtn: document.querySelector("#refreshBtn"),
@@ -228,13 +229,16 @@ const els = {
   bandDetailMeta: document.querySelector("#bandDetailMeta"),
   bandCountrySummary: document.querySelector("#bandCountrySummary"),
   bandSpotTable: document.querySelector("#bandSpotTable"),
+  pathDistanceMode: document.querySelector("#pathDistanceMode"),
   pathMinDistance: document.querySelector("#pathMinDistance"),
   queryMeta: document.querySelector("#queryMeta"),
   rbnCall: document.querySelector("#rbnCall"),
   rbnWindow: document.querySelector("#rbnWindow"),
+  rbnDistanceMode: document.querySelector("#rbnDistanceMode"),
   rbnMinDistance: document.querySelector("#rbnMinDistance"),
   rbnRunBtn: document.querySelector("#rbnRunBtn"),
   rbnMeta: document.querySelector("#rbnMeta"),
+  rbnHtmlNote: document.querySelector("#rbnHtmlNote"),
   rbnMap: document.querySelector("#rbnMap"),
   rbnTable: document.querySelector("#rbnTable"),
   rbnSummary: document.querySelector("#rbnSummary"),
@@ -252,6 +256,7 @@ const els = {
 
 let currentQueryContext = null;
 let currentPathMinDistance = 0;
+let currentPathDistanceMode = "min";
 let currentValidatedSummaryGroups = [];
 let suppressMapPreview = false;
 let openBandDetailKey = null;
@@ -554,25 +559,41 @@ function renderPathMap(a, b = null, rows = []) {
   `;
 }
 
-function liveMinDistanceKm() {
-  const value = Math.round(Number(els.liveMinDistance.value) || 0);
-  const cleanValue = Math.max(0, Math.min(20040, value));
-  els.liveMinDistance.value = String(cleanValue);
-  return cleanValue;
-}
-
-function rbnMinDistanceKm() {
-  const value = Math.round(Number(els.rbnMinDistance.value) || 0);
-  const cleanValue = Math.max(0, Math.min(20040, value));
-  els.rbnMinDistance.value = String(cleanValue);
-  return cleanValue;
-}
-
 function cleanDistanceInput(input) {
   const value = Math.round(Number(input.value) || 0);
   const cleanValue = Math.max(0, Math.min(20040, value));
   input.value = String(cleanValue);
   return cleanValue;
+}
+
+function cleanDistanceMode(value) {
+  return value === "max" ? "max" : "min";
+}
+
+function distanceModeFor(input) {
+  return cleanDistanceMode(input?.value);
+}
+
+function distanceSql(mode, value) {
+  return `${spotDistanceKmExpr} ${cleanDistanceMode(mode) === "max" ? "<=" : ">="} ${Number(value)}`;
+}
+
+function distanceFilterText(mode, value, short = false) {
+  const cleanMode = cleanDistanceMode(mode);
+  const distance = Number(value) || 0;
+  if (cleanMode === "min" && distance === 0) return "";
+  const label = cleanMode === "max" ? (short ? "max" : "maximum") : (short ? "min" : "minimum");
+  return `${label} ${distance.toLocaleString()} km`;
+}
+
+function setDistanceMode(input, mode) {
+  const cleanMode = cleanDistanceMode(mode);
+  input.value = cleanMode;
+  document.querySelectorAll(`[data-distance-target="${input.id}"]`).forEach((button) => {
+    const active = button.dataset.distanceMode === cleanMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
 }
 
 function hasUsableRemoteGeo(row) {
@@ -588,7 +609,7 @@ function hasUsableRemoteGeo(row) {
     row.remoteCountry !== "Unknown";
 }
 
-function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = null) {
+function renderLiveMap(focus, rows, minutes, flow, distanceFilter = 0, distanceMode = "min", totals = null) {
   const viewWidth = 1536;
   const viewHeight = 1024;
   const focusPoint = mapProject(boxCenter(focus));
@@ -654,7 +675,8 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
     `;
   }).join("");
   const flowText = flow === "sent" ? "sent from" : flow === "heard" ? "heard in" : "sent/heard by";
-  const distanceText = minDistance > 0 ? `, min ${minDistance.toLocaleString()} km` : "";
+  const filterText = distanceFilterText(distanceMode, distanceFilter, true);
+  const distanceText = filterText ? `, ${filterText}` : "";
   const countText = enrichedRows.length < totalSpots
     ? `${enrichedRows.length.toLocaleString()} mapped of ${totalSpots.toLocaleString()} spots`
     : `${enrichedRows.length.toLocaleString()} mapped spots`;
@@ -676,7 +698,7 @@ function renderLiveMap(focus, rows, minutes, flow, minDistance = 0, totals = nul
     : "100W estimate waiting for live spots.";
   els.liveSummary.textContent = enrichedRows.length
     ? `Farthest displayed spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${Number(enrichedRows[0].distance).toLocaleString()} km, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
-    : `No geolocated live WSPR spots found for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""} in the last ${minutes} minutes.`;
+    : `No geolocated live WSPR spots found for ${focus.name}${filterText ? ` with ${filterText}` : ""} in the last ${minutes} minutes.`;
   if (removedRows > 0 && enrichedRows.length) {
     els.liveSummary.textContent += ` Removed ${removedRows.toLocaleString()} spot${removedRows === 1 ? "" : "s"} without usable station geography.`;
   }
@@ -767,7 +789,7 @@ function rbnUrl(call, seconds) {
   return `${rbnPageEndpoint}?${params.toString()}`;
 }
 
-function parseRbnSpots(payload, call, minDistance = 0) {
+function parseRbnSpots(payload, call, distanceFilter = 0, distanceMode = "min") {
   const callInfo = payload.call_info || {};
   return Object.entries(payload.spots || {}).map(([id, row]) => {
     const [de, freq, dx, db, wpm, time, diff, band, type, mode, epoch] = row;
@@ -804,7 +826,7 @@ function parseRbnSpots(payload, call, minDistance = 0) {
       Number.isFinite(spot.deLon) &&
       Number.isFinite(spot.dxLat) &&
       Number.isFinite(spot.dxLon) &&
-      distance >= minDistance;
+      (cleanDistanceMode(distanceMode) === "max" ? distance <= distanceFilter : distance >= distanceFilter);
   }).sort((a, b) => b.epoch - a.epoch);
 }
 
@@ -872,7 +894,9 @@ let rbnTimer;
 async function runRbnMonitor(openFallback = false) {
   const call = els.rbnCall.value.trim().toUpperCase();
   const seconds = Math.max(900, Number(els.rbnWindow.value) || 900);
-  const minDistance = rbnMinDistanceKm();
+  const distanceFilter = cleanDistanceInput(els.rbnMinDistance);
+  const distanceMode = distanceModeFor(els.rbnDistanceMode);
+  const distanceText = distanceFilterText(distanceMode, distanceFilter);
   if (!call) {
     els.rbnSummary.textContent = "Enter a callsign for RBN lookup.";
     return;
@@ -892,24 +916,24 @@ async function runRbnMonitor(openFallback = false) {
     r: "100"
   });
   els.rbnRunBtn.disabled = true;
-  els.rbnMeta.textContent = `Checking ${call}, last ${seconds >= 86400 ? "24 hours" : `${Math.round(seconds / 60)} min`}${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}...`;
+  els.rbnMeta.textContent = `Checking ${call}, last ${seconds >= 86400 ? "24 hours" : `${Math.round(seconds / 60)} min`}${distanceText ? `, ${distanceText}` : ""}...`;
   try {
     const response = await fetch(`${rbnEndpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`RBN returned HTTP ${response.status}`);
     const payload = await response.json();
-    const spots = parseRbnSpots(payload, call, minDistance);
+    const spots = parseRbnSpots(payload, call, distanceFilter, distanceMode);
     renderRbnMap(spots, call);
     renderRbnTable(spots);
     const bands = [...new Set(spots.map((spot) => `${spot.bandMeters}m`))].join(", ");
-    els.rbnMeta.textContent = `${spots.length.toLocaleString()} geolocated CW RBN spots for ${call}${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}`;
+    els.rbnMeta.textContent = `${spots.length.toLocaleString()} geolocated CW RBN spots for ${call}${distanceText ? `, ${distanceText}` : ""}`;
     els.rbnSummary.innerHTML = spots.length
       ? `Bands heard: ${bands || "none"}. Auto-refreshes every 2 minutes while this page is open.`
-      : `No geolocated CW RBN spots found${minDistance ? ` beyond ${minDistance.toLocaleString()} km` : ""}. <a href="${pageUrl}" target="_blank" rel="noopener">Open RBN search</a>`;
+      : `No geolocated CW RBN spots found${distanceText ? ` with ${distanceText}` : ""}. <a href="${pageUrl}" target="_blank" rel="noopener">Open RBN search</a>`;
   } catch (error) {
     renderRbnMap([], call);
     els.rbnTable.innerHTML = "";
     els.rbnMeta.textContent = "RBN direct lookup blocked";
-    els.rbnSummary.innerHTML = `${error.message}. Browser CORS may block direct RBN JSON in the HTML version. <a href="${pageUrl}" target="_blank" rel="noopener">Open this callsign on Reverse Beacon Network</a>${minDistance ? `; apply the ${minDistance.toLocaleString()} km distance filter in WSPRSpyDX when direct RBN data is available` : ""}.`;
+    els.rbnSummary.innerHTML = `${error.message}. Browser CORS may block direct RBN JSON in the HTML version. <a href="${pageUrl}" target="_blank" rel="noopener">Open this callsign on Reverse Beacon Network</a>${distanceText ? `; apply the ${distanceText} filter in WSPRSpyDX when direct RBN data is available` : ""}.`;
   } finally {
     els.rbnRunBtn.disabled = false;
     clearInterval(rbnTimer);
@@ -1388,7 +1412,9 @@ async function runLiveMap() {
     suppressMapPreview = false;
     const focus = readBox("a");
     const minutes = Math.min(60, Math.max(15, Number(els.liveWindow.value)));
-    const minDistance = liveMinDistanceKm();
+    const distanceFilter = cleanDistanceInput(els.liveMinDistance);
+    const distanceMode = distanceModeFor(els.liveDistanceMode);
+    const filterText = distanceFilterText(distanceMode, distanceFilter);
     const flow = els.liveDirection.value;
     const focusTx = regionWhere("tx", focus);
     const focusRx = regionWhere("rx", focus);
@@ -1422,7 +1448,7 @@ async function runLiveMap() {
         AND rx_lat BETWEEN -90 AND 90
         AND tx_lon BETWEEN -180 AND 180
         AND rx_lon BETWEEN -180 AND 180
-        AND ${spotDistanceKmExpr} >= ${minDistance}
+        AND ${distanceSql(distanceMode, distanceFilter)}
       ORDER BY distance DESC, time DESC
       LIMIT ${liveRowLimit}`;
     const totalSql = `
@@ -1435,24 +1461,31 @@ async function runLiveMap() {
         AND rx_lat BETWEEN -90 AND 90
         AND tx_lon BETWEEN -180 AND 180
         AND rx_lon BETWEEN -180 AND 180
-        AND ${spotDistanceKmExpr} >= ${minDistance}`;
+        AND ${distanceSql(distanceMode, distanceFilter)}`;
     els.liveRefreshBtn.disabled = true;
-    els.liveSummary.textContent = `Checking live WSPR spots for ${focus.name}${minDistance > 0 ? ` beyond ${minDistance.toLocaleString()} km` : ""}...`;
+    els.liveSummary.textContent = `Checking live WSPR spots for ${focus.name}${filterText ? ` with ${filterText}` : ""}...`;
     const [rows, totalRows] = await Promise.all([runQuery(sql), runQuery(totalSql)]);
-    renderLiveMap(focus, rows, minutes, flow, minDistance, totalRows[0]);
+    renderLiveMap(focus, rows, minutes, flow, distanceFilter, distanceMode, totalRows[0]);
   } catch (error) {
     suppressMapPreview = false;
     els.liveMapMeta.textContent = "Live WSPR map";
     els.liveSummary.textContent = error.message;
     try {
-      renderLiveMap(readBox("a"), [], Number(els.liveWindow.value) || 15, els.liveDirection.value, liveMinDistanceKm());
+      renderLiveMap(
+        readBox("a"),
+        [],
+        Number(els.liveWindow.value) || 15,
+        els.liveDirection.value,
+        cleanDistanceInput(els.liveMinDistance),
+        distanceModeFor(els.liveDistanceMode)
+      );
     } catch (mapError) {}
   } finally {
     els.liveRefreshBtn.disabled = false;
   }
 }
 
-function summaryCandidateSqlFor(context, minDistance = 0, sinceOverride = context.since) {
+function summaryCandidateSqlFor(context, distanceFilter = 0, distanceMode = "min", sinceOverride = context.since) {
   return `
       SELECT
         max(time) AS latest_time,
@@ -1475,7 +1508,7 @@ function summaryCandidateSqlFor(context, minDistance = 0, sinceOverride = contex
         AND rx_loc != ''
         ${validSpotCoordsSql}
         AND ${spotDistanceKmExpr} > 0
-        AND ${spotDistanceKmExpr} >= ${minDistance}
+        AND ${distanceSql(distanceMode, distanceFilter)}
       GROUP BY band, hour, tx_sign, rx_sign, tx_lat, tx_lon, rx_lat, rx_lon
       ORDER BY latest_time DESC
       LIMIT 80000`;
@@ -1493,11 +1526,11 @@ function summaryTimeWindows(days) {
   return windows;
 }
 
-async function runSummaryCandidateQueries(context, minDistance = 0) {
+async function runSummaryCandidateQueries(context, distanceFilter = 0, distanceMode = "min") {
   const windows = summaryTimeWindows(context.days);
   const chunks = [];
   for (const windowWhere of windows) {
-    const rows = await runQuery(summaryCandidateSqlFor(context, minDistance, windowWhere));
+    const rows = await runQuery(summaryCandidateSqlFor(context, distanceFilter, distanceMode, windowWhere));
     chunks.push(...rows.map(normaliseDetailSpot));
   }
   return chunks;
@@ -1661,7 +1694,7 @@ function renderBandSpotDetails(band, startHour, rows, minDistance, durationHours
   ` : "";
 }
 
-function renderBandPairDetails(band, startHour, rows, minDistance, durationHours = 1, databaseCount = 0) {
+function renderBandPairDetails(band, startHour, rows, distanceFilter, distanceMode = "min", durationHours = 1, databaseCount = 0) {
   const endHour = (Number(startHour) + Number(durationHours)) % 24;
   const windowText = `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:00 UTC`;
   const pairs = summariseStationPairs(rows);
@@ -1669,7 +1702,8 @@ function renderBandPairDetails(band, startHour, rows, minDistance, durationHours
   const receptionCount = pairs.reduce((sum, pair) => sum + pair.count, 0);
   const displayedPairs = Math.min(50, pairs.length);
   const limitText = pairs.length > displayedPairs ? ` Showing the top ${displayedPairs.toLocaleString()} pairs.` : "";
-  els.bandDetailMeta.textContent = `${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. This is the same validated reception count shown in the UTC cell. Sorted by longest distance first.${limitText}`;
+  const filterText = distanceFilterText(distanceMode, distanceFilter);
+  els.bandDetailMeta.textContent = `${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${filterText ? `, ${filterText}` : ""}. This is the same validated reception count shown in the UTC cell. Sorted by longest distance first.${limitText}`;
   const countries = [...rows.reduce((map, row) => {
     const country = remoteCountryForSpot(row, currentQueryContext);
     const snr100w = scaledSnr(row.snr, row.power);
@@ -1714,7 +1748,7 @@ async function showUtcWindowDetails(band, startHour, databaseCount = 0) {
     return;
   }
   openBandDetailKey = detailKey;
-  const minDistance = currentPathMinDistance;
+  const distanceFilter = currentPathMinDistance;
   panel.hidden = false;
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots loading...`;
   els.bandDetailMeta.textContent = "Querying matching WSPR spots for the selected UTC window.";
@@ -1724,7 +1758,7 @@ async function showUtcWindowDetails(band, startHour, databaseCount = 0) {
     const cleanRows = currentValidatedSummaryGroups.filter((row) =>
       Number(row.band) === Number(band) && Number(row.hour) === Number(startHour)
     );
-    renderBandPairDetails(band, startHour, cleanRows, minDistance, 1, databaseCount);
+    renderBandPairDetails(band, startHour, cleanRows, distanceFilter, currentPathDistanceMode, 1, databaseCount);
   } catch (error) {
     els.bandDetailTitle.textContent = `${bandLabel(band)} spot detail unavailable`;
     els.bandDetailMeta.textContent = error.message;
@@ -1748,9 +1782,11 @@ async function run() {
     currentQueryContext = { a, b, days, where, since };
 
     const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
+    const pathDistanceMode = distanceModeFor(els.pathDistanceMode);
     currentPathMinDistance = pathMinDistance;
+    currentPathDistanceMode = pathDistanceMode;
     savePathSettings();
-    const summaryCandidates = await runSummaryCandidateQueries(currentQueryContext, pathMinDistance);
+    const summaryCandidates = await runSummaryCandidateQueries(currentQueryContext, pathMinDistance, pathDistanceMode);
     currentValidatedSummaryGroups = summaryCandidates
       .map((row) => validatedPathSpot(row, currentQueryContext))
       .filter(Boolean);
@@ -1758,7 +1794,8 @@ async function run() {
     renderPathMap(a, b, summaryCandidates);
     renderHeatmap(summary);
     runLiveMap();
-    els.queryMeta.textContent = `${pathLabel}, ${days} days${pathMinDistance ? `, min ${pathMinDistance.toLocaleString()} km` : ""}`;
+    const pathDistanceText = distanceFilterText(pathDistanceMode, pathMinDistance, true);
+    els.queryMeta.textContent = `${pathLabel}, ${days} days${pathDistanceText ? `, ${pathDistanceText}` : ""}`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} confirmed spots across ${summary.length} band/hour slots.`);
   } catch (error) {
     setStatus(error.message, true);
@@ -1817,6 +1854,7 @@ function savePathSettings() {
       bMode: els.bMode.value,
       bCountry: els.bCountry.value,
       direction: els.direction.value,
+      pathDistanceMode: els.pathDistanceMode.value,
       pathMinDistance: els.pathMinDistance.value
     }));
   } catch (error) {}
@@ -1830,6 +1868,7 @@ function restorePathSettings() {
     if (saved.aMode) els.aMode.value = saved.aMode;
     if (saved.bMode) els.bMode.value = saved.bMode;
     if (saved.direction) els.direction.value = saved.direction;
+    setDistanceMode(els.pathDistanceMode, saved.pathDistanceMode || "min");
     if (saved.pathMinDistance !== undefined) els.pathMinDistance.value = saved.pathMinDistance;
     els.aCountry.value = saved.aCountry || "";
     els.bCountry.value = saved.bCountry || "";
@@ -1957,6 +1996,16 @@ els.pathMinDistance.addEventListener("keydown", (event) => {
 els.period.addEventListener("change", savePathSettings);
 els.direction.addEventListener("change", savePathSettings);
 els.pathMinDistance.addEventListener("change", savePathSettings);
+document.querySelectorAll(".distance-mode-button").forEach((button) => {
+  button.addEventListener("click", () => {
+    const input = document.querySelector(`#${button.dataset.distanceTarget}`);
+    if (!input) return;
+    setDistanceMode(input, button.dataset.distanceMode);
+    if (input === els.pathDistanceMode) savePathSettings();
+    if (input === els.liveDistanceMode) runLiveMap();
+    if (input === els.rbnDistanceMode) runRbnMonitor(false);
+  });
+});
 els.liveRefreshBtn.addEventListener("click", runLiveMap);
 function handleLiveDetailClick(event) {
   const trigger = event.target.closest(".live-detail-trigger");
@@ -2026,6 +2075,10 @@ if ("serviceWorker" in navigator) {
 }
 
 const hasSavedPathSettings = restorePathSettings();
+els.rbnHtmlNote.hidden = navigator.userAgent.includes("WSPRSpyDX-Android");
+setDistanceMode(els.pathDistanceMode, els.pathDistanceMode.value);
+setDistanceMode(els.liveDistanceMode, els.liveDistanceMode.value);
+setDistanceMode(els.rbnDistanceMode, els.rbnDistanceMode.value);
 updateModeUi("a", false);
 updateModeUi("b", false);
 renderRbnMap([], els.rbnCall.value.trim().toUpperCase() || "CALL");

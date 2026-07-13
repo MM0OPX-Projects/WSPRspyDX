@@ -6,22 +6,22 @@ The project is available in three formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
 - **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR, NOAA and RBN data.
-- **Android APK**: `releases/WSPRSpyDX-v0.43-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.44-debug.apk` is a debug-signed test build that bundles the same dashboard inside a small Android WebView app.
 
 ## Features
 
 - Queries historical WSPR spots from the public WSPR Live ClickHouse endpoint.
 - Lets you type countries or major regions for each end of the path.
-- Lets you leave Region B blank to check Region A against anywhere, then use the main historical minimum-distance filter for DX filtering.
+- Lets you leave Region B blank to check Region A against anywhere, then use the main historical minimum/maximum-distance filter.
 - Adds path modes for country/region, CQ zone, ITU zone, and Maidenhead locator searches.
 - Supports multiple target zones or locators, for example `14` to `1,2`.
 - Includes shortcuts for Scotland, New Zealand, USA East Coast, USA West Coast, and other common regions.
 - Supports history windows from recent days up to longer lookbacks.
 - Shows best bands and best UTC operating windows by band.
 - Lets you tap a populated UTC Window cell to inspect matching WSPR spots, likely countries, distances, SNR, power, and 100 W mode estimates.
-- Adds a main historical minimum-distance filter for UTC Windows, with separate distance filters for Live Openings and the CW Reverse Beacon Network monitor.
+- Adds independently selectable minimum/maximum-distance filters for UTC Windows, Live Openings, and the CW Reverse Beacon Network monitor.
 - Includes a live openings map with band-coloured paths, hot bands, hot countries, and 100 W mode estimates.
-- Includes a CW Reverse Beacon Network monitor with callsign, time-window, and minimum-distance filtering.
+- Includes a CW Reverse Beacon Network monitor with callsign, time-window, and minimum/maximum-distance filtering.
 - Estimates 100 W equivalent signal reports from WSPR SNR and reported transmit power.
 - Shows green/red mode chips for approximate FT8, CW, and SSB viability.
 - Adds a NOAA/SWPC geomagnetic activity warning when the last 24 hours of Kp data may make current HF conditions differ from the historical pattern.
@@ -92,7 +92,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.43-debug.apk
+releases/WSPRSpyDX-v0.44-debug.apk
 ```
 
 To install it on Android:
@@ -131,7 +131,7 @@ The current test APK was built locally from this wrapper and the dashboard asset
 |   `-- build-standalone.ps1
 |-- android-apk/
 `-- releases/
-    `-- WSPRSpyDX-v0.43-debug.apk
+    `-- WSPRSpyDX-v0.44-debug.apk
 ```
 
 ## Notes

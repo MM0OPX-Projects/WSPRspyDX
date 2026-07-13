@@ -379,8 +379,60 @@ h2 {
   width: 100%;
 }
 
+.distance-filter {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.distance-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 10px;
+  background: rgba(5,13,25,.48);
+}
+
+.distance-toggle .distance-mode-button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.distance-toggle .distance-mode-button.active {
+  background: var(--blue);
+  color: #06111f;
+  box-shadow: 0 2px 8px rgba(73,167,255,.26);
+}
+
 .rbn-controls {
   grid-template-columns: auto minmax(92px, 130px) auto minmax(96px, 130px) minmax(128px, auto) minmax(76px, 120px) minmax(110px, 140px);
+}
+
+.rbn-html-note {
+  max-width: 620px;
+  margin: 7px 0 0;
+  padding: 8px 10px;
+  border-left: 4px solid var(--warn);
+  border-radius: 6px;
+  background: rgba(246,201,69,.1);
+  color: #f5d979;
+  font-size: .78rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.rbn-html-note[hidden] {
+  display: none;
 }
 
 .live-bands,
@@ -923,6 +975,10 @@ h2 {
 
   .live-controls button {
     grid-column: 1 / -1;
+  }
+
+  .live-controls .distance-toggle button {
+    grid-column: auto;
   }
 
   .rbn-controls {

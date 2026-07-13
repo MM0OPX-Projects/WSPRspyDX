@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=65">
+  <link rel="stylesheet" href="styles.css?v=66">
 </head>
 <body>
   <main class="wrap">
@@ -81,8 +81,15 @@
           </select>
         </div>
         <div class="selectBox">
-          <label for="pathMinDistance">Minimum distance (km)</label>
-          <input id="pathMinDistance" type="number" min="0" max="20040" step="100" value="0" inputmode="numeric" placeholder="0" aria-label="Path minimum distance in kilometres">
+          <label for="pathMinDistance">Distance (km)</label>
+          <div class="distance-filter">
+            <input id="pathDistanceMode" type="hidden" value="min">
+            <div class="distance-toggle" role="group" aria-label="Historical distance filter mode">
+              <button class="distance-mode-button active" type="button" data-distance-target="pathDistanceMode" data-distance-mode="min" aria-pressed="true">Minimum</button>
+              <button class="distance-mode-button" type="button" data-distance-target="pathDistanceMode" data-distance-mode="max" aria-pressed="false">Maximum</button>
+            </div>
+            <input id="pathMinDistance" type="number" min="0" max="20040" step="100" value="0" inputmode="numeric" placeholder="0" aria-label="Historical distance in kilometres">
+          </div>
         </div>
         <div class="selectBox runBox">
           <label>&nbsp;</label>
@@ -183,8 +190,15 @@
             <option value="sent">Sent from A</option>
             <option value="heard">Heard in A</option>
           </select>
-          <label for="liveMinDistance">Minimum distance (km)</label>
-          <input id="liveMinDistance" type="number" min="0" max="20040" step="100" value="0" list="liveDistanceOptions" inputmode="numeric" placeholder="0" aria-label="Live minimum distance in kilometres">
+          <label for="liveMinDistance">Distance (km)</label>
+          <div class="distance-filter">
+            <input id="liveDistanceMode" type="hidden" value="min">
+            <div class="distance-toggle" role="group" aria-label="Live distance filter mode">
+              <button class="distance-mode-button active" type="button" data-distance-target="liveDistanceMode" data-distance-mode="min" aria-pressed="true">Minimum</button>
+              <button class="distance-mode-button" type="button" data-distance-target="liveDistanceMode" data-distance-mode="max" aria-pressed="false">Maximum</button>
+            </div>
+            <input id="liveMinDistance" type="number" min="0" max="20040" step="100" value="0" list="liveDistanceOptions" inputmode="numeric" placeholder="0" aria-label="Live distance in kilometres">
+          </div>
           <datalist id="liveDistanceOptions">
             <option value="0"></option>
             <option value="500"></option>
@@ -219,6 +233,7 @@
         <div>
           <h2>CW RBN Monitor</h2>
           <span id="rbnMeta">Reverse Beacon Network spot lookup</span>
+          <p class="rbn-html-note" id="rbnHtmlNote" hidden>RBN monitoring works only in the Android app. Browser security restrictions block the direct RBN feed in the HTML version.</p>
         </div>
         <div class="live-controls rbn-controls">
           <label for="rbnCall">Call</label>
@@ -230,8 +245,15 @@
             <option value="3600">1 hour</option>
             <option value="86400">24 hours</option>
           </select>
-          <label for="rbnMinDistance">Minimum distance (km)</label>
-          <input id="rbnMinDistance" type="number" min="0" max="20040" step="100" value="0" inputmode="numeric" placeholder="0" aria-label="RBN minimum distance in kilometres">
+          <label for="rbnMinDistance">Distance (km)</label>
+          <div class="distance-filter">
+            <input id="rbnDistanceMode" type="hidden" value="min">
+            <div class="distance-toggle" role="group" aria-label="RBN distance filter mode">
+              <button class="distance-mode-button active" type="button" data-distance-target="rbnDistanceMode" data-distance-mode="min" aria-pressed="true">Minimum</button>
+              <button class="distance-mode-button" type="button" data-distance-target="rbnDistanceMode" data-distance-mode="max" aria-pressed="false">Maximum</button>
+            </div>
+            <input id="rbnMinDistance" type="number" min="0" max="20040" step="100" value="0" inputmode="numeric" placeholder="0" aria-label="RBN distance in kilometres">
+          </div>
           <button id="rbnRunBtn" type="button">Run RBN</button>
         </div>
       </div>
@@ -248,6 +270,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=65"></script>
+  <script src="app.js?v=66"></script>
 </body>
 </html>

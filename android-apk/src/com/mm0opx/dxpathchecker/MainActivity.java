@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
+        settings.setUserAgentString(settings.getUserAgentString() + " WSPRSpyDX-Android");
 
         setContentView(webView);
         webView.loadUrl("file:///android_asset/index.html");
