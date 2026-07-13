@@ -6,7 +6,7 @@ The project is available in three formats:
 
 - **HTML/PWA dashboard**: the source files at the repository root can be hosted with GitHub Pages or any static web host.
 - **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR and NOAA data. The CW RBN Monitor is available only in the Android app.
-- **Android APK**: `releases/WSPRSpyDX-v0.51-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.52-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
 
 ## Features
 
@@ -92,7 +92,7 @@ GitHub will provide a public URL for the HTML dashboard.
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.51-debug.apk
+releases/WSPRSpyDX-v0.52-debug.apk
 ```
 
 To install it on Android:
@@ -115,6 +115,14 @@ The `android-apk/` folder contains a minimal native Android WebView wrapper:
 
 The current test APK was built locally from this wrapper and the dashboard assets.
 
+Build and validate a new test APK with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\build-apk.ps1 -VersionCode 52 -VersionName 0.52
+```
+
+The builder verifies that `classes.dex` is at the APK root, checks ZIP alignment, and verifies the APK signature before returning a release file.
+
 ## Repository Layout
 
 ```text
@@ -128,10 +136,11 @@ The current test APK was built locally from this wrapper and the dashboard asset
 |-- icon.svg
 |-- world-map.png
 |-- tools/
-|   `-- build-standalone.ps1
+|   |-- build-standalone.ps1
+|   `-- build-apk.ps1
 |-- android-apk/
 `-- releases/
-    `-- WSPRSpyDX-v0.51-debug.apk
+    `-- WSPRSpyDX-v0.52-debug.apk
 ```
 
 ## Notes
