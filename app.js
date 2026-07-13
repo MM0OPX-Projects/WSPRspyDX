@@ -260,6 +260,8 @@ let currentPathDistanceMode = "min";
 let currentValidatedSummaryGroups = [];
 let suppressMapPreview = false;
 let openBandDetailKey = null;
+let openBandCountry = null;
+let currentBandDetailState = null;
 let currentLiveRows = [];
 let openLiveDetailKey = null;
 let liveTouchGesture = null;
@@ -1398,6 +1400,8 @@ function ensureBandDetailPanel() {
 function resetBandDetailPanel() {
   const panel = ensureBandDetailPanel();
   openBandDetailKey = null;
+  openBandCountry = null;
+  currentBandDetailState = null;
   els.bandDetailTitle.textContent = "Select a UTC window to see matching spots";
   els.bandDetailMeta.textContent = "Tap a populated UTC window for country and 100W spot detail.";
   els.bandCountrySummary.innerHTML = "";
@@ -1703,7 +1707,9 @@ function renderBandPairDetails(band, startHour, rows, distanceFilter, distanceMo
   const displayedPairs = Math.min(50, pairs.length);
   const limitText = pairs.length > displayedPairs ? ` Showing the top ${displayedPairs.toLocaleString()} pairs.` : "";
   const filterText = distanceFilterText(distanceMode, distanceFilter);
-  els.bandDetailMeta.textContent = `${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${filterText ? `, ${filterText}` : ""}. This is the same validated reception count shown in the UTC cell. Sorted by longest distance first.${limitText}`;
+  const baseMeta = `${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${filterText ? `, ${filterText}` : ""}. This is the same validated reception count shown in the UTC cell. Sorted by longest distance first.${limitText}`;
+  els.bandDetailMeta.textContent = baseMeta;
+  currentBandDetailState = { band, startHour, rows, baseMeta };
   const countries = [...rows.reduce((map, row) => {
     const country = remoteCountryForSpot(row, currentQueryContext);
     const snr100w = scaledSnr(row.snr, row.power);
@@ -1715,11 +1721,15 @@ function renderBandPairDetails(band, startHour, rows, distanceFilter, distanceMo
     return map;
   }, new Map()).values()].sort((a, b) => b.spots - a.spots || b.best - a.best).slice(0, 10);
   els.bandCountrySummary.innerHTML = countries.length ? countries.map((item) => `
-    <span class="live-country-chip">
+    <button type="button" class="live-country-chip live-detail-trigger utc-country-trigger" data-utc-country="${escapeHtml(item.country)}" aria-expanded="false">
       <b>${escapeHtml(item.country)}</b>
       <span>${spotCountText(item.spots)} &middot; ${compactModeLabel(item.mode)} &middot; best ${item.best >= 0 ? "+" : ""}${item.best.toFixed(0)} dB</span>
-    </span>
+    </button>
   `).join("") : `<span class="live-band-empty">No country summary for this window.</span>`;
+  renderUtcPairTable(pairs);
+}
+
+function renderUtcPairTable(pairs) {
   els.bandSpotTable.innerHTML = pairs.length ? `
     <tr><th>Latest UTC</th><th>TX</th><th>RX</th><th>Receptions</th><th>Countries</th><th>Max distance</th><th>Best SNR</th><th>Best 100W est</th><th>Mode</th></tr>
     ${pairs.slice(0, 50).map((pair) => `
@@ -1738,6 +1748,26 @@ function renderBandPairDetails(band, startHour, rows, distanceFilter, distanceMo
   ` : "";
 }
 
+function toggleUtcCountryDetails(country) {
+  if (!currentBandDetailState) return;
+  openBandCountry = openBandCountry === country ? null : country;
+  const rows = openBandCountry
+    ? currentBandDetailState.rows.filter((row) => remoteCountryForSpot(row, currentQueryContext) === openBandCountry)
+    : currentBandDetailState.rows;
+  const pairs = summariseStationPairs(rows);
+  const receptionCount = pairs.reduce((sum, pair) => sum + pair.count, 0);
+  els.bandCountrySummary.querySelectorAll("[data-utc-country]").forEach((button) => {
+    button.setAttribute("aria-expanded", String(button.dataset.utcCountry === openBandCountry));
+  });
+  if (openBandCountry) {
+    const shown = Math.min(50, pairs.length);
+    els.bandDetailMeta.textContent = `${openBandCountry}: ${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs. Sorted by longest distance first.${pairs.length > shown ? ` Showing the top ${shown.toLocaleString()} pairs.` : ""}`;
+  } else {
+    els.bandDetailMeta.textContent = currentBandDetailState.baseMeta;
+  }
+  renderUtcPairTable(pairs);
+}
+
 async function showUtcWindowDetails(band, startHour, databaseCount = 0) {
   if (!currentQueryContext) return;
   const detailKey = `${Number(band)}-${Number(startHour)}`;
@@ -1748,6 +1778,8 @@ async function showUtcWindowDetails(band, startHour, databaseCount = 0) {
     return;
   }
   openBandDetailKey = detailKey;
+  openBandCountry = null;
+  currentBandDetailState = null;
   const distanceFilter = currentPathMinDistance;
   panel.hidden = false;
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots loading...`;
@@ -2046,6 +2078,10 @@ function handleLiveClick(event) {
   container.addEventListener("pointerup", finishLiveTouch);
   container.addEventListener("pointercancel", cancelLiveTouch);
   container.addEventListener("click", handleLiveClick);
+});
+els.bandCountrySummary.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-utc-country]");
+  if (button) toggleUtcCountryDetails(button.dataset.utcCountry);
 });
 els.liveWindow.addEventListener("change", runLiveMap);
 els.liveDirection.addEventListener("change", runLiveMap);
