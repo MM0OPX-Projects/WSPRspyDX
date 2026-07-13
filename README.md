@@ -4,7 +4,7 @@ WSPRSpyDX is a compact DX path dashboard for checking historical WSPR propagatio
 
 The project is available in three formats:
 
-- **HTML/PWA dashboard**: [open WSPRSpyDX on GitHub Pages](https://mm0opx-projects.github.io/WSPRSpyDX/). This is the recommended version for iPhone and iPad.
+- **HTML/PWA dashboard**: [open WSPRSpyDX on GitHub Pages](https://mm0opx-projects.github.io/WSPRspyDX/). This is the recommended version for iPhone and iPad.
 - **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR and NOAA data. The CW RBN Monitor is available only in the Android app.
 - **Android APK**: `releases/WSPRSpyDX-v0.53-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
 
@@ -80,7 +80,7 @@ This creates `WSPRSpyDX-standalone.html`. It can be opened directly or uploaded 
 The live HTML dashboard is published at:
 
 ```text
-https://mm0opx-projects.github.io/WSPRSpyDX/
+https://mm0opx-projects.github.io/WSPRspyDX/
 ```
 
 The workflow in `.github/workflows/pages.yml` republishes the site after changes to `main`.
