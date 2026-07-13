@@ -459,6 +459,8 @@ h2 {
   .liveMapCard .live-controls label[for="liveMinDistance"] {
     grid-column: 5;
     grid-row: 2;
+    align-self: end;
+    margin-bottom: 13px;
   }
 
   .liveMapCard .live-controls .distance-filter {
