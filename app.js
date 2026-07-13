@@ -252,6 +252,7 @@ const els = {
 
 let currentQueryContext = null;
 let currentPathMinDistance = 0;
+let currentValidatedSummaryGroups = [];
 let suppressMapPreview = false;
 let openBandDetailKey = null;
 let currentLiveRows = [];
@@ -316,7 +317,7 @@ function countryFromCoords(lat, lon) {
 function callsignMatchesCoords(country, lat, lon) {
   if (!country || country === "Unknown") return false;
   const boxes = countryGeoBoxes.filter((box) => box.name === country);
-  if (!boxes.length) return true;
+  if (!boxes.length) return false;
   return boxes.some((box) =>
     Number(lat) >= box.latMin &&
     Number(lat) <= box.latMax &&
@@ -327,11 +328,8 @@ function callsignMatchesCoords(country, lat, lon) {
 
 function stationCountry(sign, lat, lon) {
   const prefixCountry = callsignCountry(sign);
-  const locatorCountry = countryFromCoords(lat, lon);
-  if (prefixCountry !== "Unknown") {
-    return callsignMatchesCoords(prefixCountry, lat, lon) ? prefixCountry : null;
-  }
-  return locatorCountry !== "Unknown" ? locatorCountry : null;
+  if (prefixCountry === "Unknown") return null;
+  return callsignMatchesCoords(prefixCountry, lat, lon) ? prefixCountry : null;
 }
 
 function validatedSpot(row) {
@@ -504,7 +502,7 @@ function renderPathMap(a, b = null, rows = []) {
         : { country: clean.txCountry, lat: clean.tx_lat, lon: clean.tx_lon, distance: Number(clean.distance) };
       if (!remote.country || remote.country === "Unknown") return;
       const current = remoteMap.get(remote.country) || { ...remote, spots: 0, maxDistance: 0 };
-      current.spots += 1;
+      current.spots += Number(clean.spot_count) || 1;
       if (remote.distance > current.maxDistance) {
         current.lat = remote.lat;
         current.lon = remote.lon;
@@ -1288,7 +1286,7 @@ function renderHeatmap(rows) {
     const cells = activeBands.map((band) => {
       const row = lookup.get(`${band}-${hour}`);
       const count = row ? Number(row.spots) : 0;
-      const title = row ? `${bandLabel(band)} ${hour}:00 UTC: ${count} WSPR database receptions, avg SNR ${row.avg_snr} dB` : "";
+      const title = row ? `${bandLabel(band)} ${hour}:00 UTC: ${count} confirmed WSPR receptions, avg SNR ${row.avg_snr} dB` : "";
       const digitClass = count ? ` digits-${Math.min(6, String(count).length)}` : "";
       return `<td class="${count ? "heatmap-cell" : ""}${digitClass}" data-band="${band}" data-hour="${hour}" data-receptions="${count}" title="${title}" style="background:${heatColor(count, max)}" tabindex="${count ? "0" : "-1"}"><span>${count || ""}</span></td>`;
     }).join("");
@@ -1317,10 +1315,13 @@ function aggregateSummaryRows(rows, context) {
       best_power: 0,
       countries: new Set()
     };
-    bucket.spots += 1;
+    const receptionCount = Number(clean.spot_count) || 1;
+    bucket.spots += receptionCount;
     bucket.txSigns.add(clean.tx_sign);
     bucket.rxSigns.add(clean.rx_sign);
-    bucket.snrTotal += Number(clean.snr);
+    bucket.snrTotal += Number.isFinite(Number(clean.snr_sum))
+      ? Number(clean.snr_sum)
+      : Number(clean.snr) * receptionCount;
     bucket.countries.add(`${clean.txCountry} to ${clean.rxCountry}`);
     if (Number(clean.snr) > bucket.best_snr) {
       bucket.best_snr = Number(clean.snr);
@@ -1454,7 +1455,7 @@ async function runLiveMap() {
 function summaryCandidateSqlFor(context, minDistance = 0, sinceOverride = context.since) {
   return `
       SELECT
-        time,
+        max(time) AS latest_time,
         band,
         toHour(time) AS hour,
         tx_sign,
@@ -1463,9 +1464,11 @@ function summaryCandidateSqlFor(context, minDistance = 0, sinceOverride = contex
         tx_lon,
         rx_lat,
         rx_lon,
-        round(${spotDistanceKmExpr}, 1) AS distance,
-        snr,
-        power
+        round(max(${spotDistanceKmExpr}), 1) AS distance,
+        count() AS spot_count,
+        sum(snr) AS snr_sum,
+        max(snr) AS detail_snr,
+        argMax(power, snr) AS detail_power
       FROM wspr.rx
       WHERE ${sinceOverride} AND band IN (${bandSqlList}) AND ${context.where}
         AND tx_loc != ''
@@ -1473,31 +1476,9 @@ function summaryCandidateSqlFor(context, minDistance = 0, sinceOverride = contex
         ${validSpotCoordsSql}
         AND ${spotDistanceKmExpr} > 0
         AND ${spotDistanceKmExpr} >= ${minDistance}
-      ORDER BY time DESC
+      GROUP BY band, hour, tx_sign, rx_sign, tx_lat, tx_lon, rx_lat, rx_lon
+      ORDER BY latest_time DESC
       LIMIT 80000`;
-}
-
-function summaryAggregateSqlFor(context, minDistance = 0) {
-  return `
-      SELECT
-        band,
-        toHour(time) AS hour,
-        count() AS spots,
-        uniq(tx_sign) AS tx_count,
-        uniq(rx_sign) AS rx_count,
-        round(avg(snr), 1) AS avg_snr,
-        max(snr) AS best_snr,
-        argMax(power, snr) AS best_power,
-        1 AS country_count
-      FROM wspr.rx
-      WHERE ${context.since} AND band IN (${bandSqlList}) AND ${context.where}
-        AND tx_loc != ''
-        AND rx_loc != ''
-        ${validSpotCoordsSql}
-        AND ${spotDistanceKmExpr} > 0
-        AND ${spotDistanceKmExpr} >= ${minDistance}
-      GROUP BY band, hour
-      ORDER BY band, hour`;
 }
 
 function summaryTimeWindows(days) {
@@ -1517,13 +1498,9 @@ async function runSummaryCandidateQueries(context, minDistance = 0) {
   const chunks = [];
   for (const windowWhere of windows) {
     const rows = await runQuery(summaryCandidateSqlFor(context, minDistance, windowWhere));
-    chunks.push(...rows);
+    chunks.push(...rows.map(normaliseDetailSpot));
   }
   return chunks;
-}
-
-async function runSummaryAggregateQuery(context, minDistance = 0) {
-  return runQuery(summaryAggregateSqlFor(context, minDistance));
 }
 
 function bandSpotSqlFor(context, band, startHour, minDistance = 0, durationHours = 1) {
@@ -1690,11 +1667,7 @@ function renderBandPairDetails(band, startHour, rows, minDistance, durationHours
   const pairs = summariseStationPairs(rows);
   els.bandDetailTitle.textContent = `${bandLabel(band)} spots, ${windowText}`;
   const receptionCount = pairs.reduce((sum, pair) => sum + pair.count, 0);
-  const rejectedCount = Math.max(0, Number(databaseCount) - receptionCount);
-  const validationText = databaseCount
-    ? `${Number(databaseCount).toLocaleString()} database receptions in the UTC cell; ${receptionCount.toLocaleString()} have confirmed station geography`
-    : `${receptionCount.toLocaleString()} receptions have confirmed station geography`;
-  els.bandDetailMeta.textContent = `${validationText}, compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${rejectedCount ? ` (${rejectedCount.toLocaleString()} excluded because callsign and location did not agree)` : ""}${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. Sorted by longest distance first.`;
+  els.bandDetailMeta.textContent = `${receptionCount.toLocaleString()} confirmed receptions compressed into ${pairs.length.toLocaleString()} TX/RX station pairs${minDistance ? `, minimum ${minDistance.toLocaleString()} km` : ""}. This is the same validated reception count shown in the UTC cell. Sorted by longest distance first.`;
   const countries = [...rows.reduce((map, row) => {
     const country = remoteCountryForSpot(row, currentQueryContext);
     const snr100w = scaledSnr(row.snr, row.power);
@@ -1746,8 +1719,9 @@ async function showUtcWindowDetails(band, startHour, databaseCount = 0) {
   els.bandCountrySummary.innerHTML = "";
   els.bandSpotTable.innerHTML = "";
   try {
-    const rows = await runQuery(bandSpotSqlFor(currentQueryContext, band, startHour, minDistance, 1));
-    const cleanRows = rows.map(normaliseDetailSpot).map((row) => validatedPathSpot(row, currentQueryContext)).filter(Boolean);
+    const cleanRows = currentValidatedSummaryGroups.filter((row) =>
+      Number(row.band) === Number(band) && Number(row.hour) === Number(startHour)
+    );
     renderBandPairDetails(band, startHour, cleanRows, minDistance, 1, databaseCount);
   } catch (error) {
     els.bandDetailTitle.textContent = `${bandLabel(band)} spot detail unavailable`;
@@ -1774,15 +1748,16 @@ async function run() {
     const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
     currentPathMinDistance = pathMinDistance;
     savePathSettings();
-    const [summary, summaryCandidates] = await Promise.all([
-      runSummaryAggregateQuery(currentQueryContext, pathMinDistance),
-      runSummaryCandidateQueries(currentQueryContext, pathMinDistance)
-    ]);
+    const summaryCandidates = await runSummaryCandidateQueries(currentQueryContext, pathMinDistance);
+    currentValidatedSummaryGroups = summaryCandidates
+      .map((row) => validatedPathSpot(row, currentQueryContext))
+      .filter(Boolean);
+    const summary = aggregateSummaryRows(currentValidatedSummaryGroups, currentQueryContext);
     renderPathMap(a, b, summaryCandidates);
     renderHeatmap(summary);
     runLiveMap();
     els.queryMeta.textContent = `${pathLabel}, ${days} days${pathMinDistance ? `, min ${pathMinDistance.toLocaleString()} km` : ""}`;
-    setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} spots across ${summary.length} band/hour slots.`);
+    setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} confirmed spots across ${summary.length} band/hour slots.`);
   } catch (error) {
     setStatus(error.message, true);
   } finally {
