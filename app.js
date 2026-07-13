@@ -3,7 +3,7 @@ const geocodeEndpoint = "https://nominatim.openstreetmap.org/search";
 const kpEndpoint = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
 const rbnEndpoint = "https://www.reversebeacon.net/spots.php";
 const rbnPageEndpoint = "https://www.reversebeacon.net/main.php";
-const rbnVersionHash = "ab6db5";
+let rbnVersionHash = "be25f6";
 
 const knownRegions = {
   scotland: { name: "Scotland", lat: 56.8, lon: -4.2, latMin: 54.5, latMax: 61.1, lonMin: -8.9, lonMax: -0.5 },
@@ -893,6 +893,49 @@ function renderRbnTable(spots) {
 
 let rbnTimer;
 
+async function fetchRbnJson(url) {
+  if (window.AndroidRbn?.fetchRbn) {
+    const raw = String(window.AndroidRbn.fetchRbn(url) || "");
+    const splitAt = raw.indexOf("\n");
+    const status = Number(splitAt >= 0 ? raw.slice(0, splitAt) : 0);
+    const body = splitAt >= 0 ? raw.slice(splitAt + 1) : raw;
+    if (!body) throw new Error(`RBN returned HTTP ${status || "error"} with no data`);
+    let payload;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      throw new Error(`RBN returned invalid JSON (HTTP ${status || "error"})`);
+    }
+    return { ok: status >= 200 && status < 300, status, payload };
+  }
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(`RBN returned invalid JSON (HTTP ${response.status})`);
+  }
+  return { ok: response.ok, status: response.status, payload };
+}
+
+async function requestRbnPayload(params) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    params.set("h", rbnVersionHash);
+    const result = await fetchRbnJson(`${rbnEndpoint}?${params.toString()}`);
+    const serverHash = String(result.payload?.ver_h || "").trim();
+    if (serverHash && serverHash !== rbnVersionHash && attempt === 0) {
+      rbnVersionHash = serverHash;
+      continue;
+    }
+    if (!result.ok) {
+      const errorCode = result.payload?.error ? `, error ${result.payload.error}` : "";
+      throw new Error(`RBN returned HTTP ${result.status}${errorCode}`);
+    }
+    return result.payload;
+  }
+  throw new Error("RBN rejected the refreshed API version");
+}
+
 async function runRbnMonitor(openFallback = false) {
   const call = els.rbnCall.value.trim().toUpperCase();
   const seconds = Math.max(900, Number(els.rbnWindow.value) || 900);
@@ -920,9 +963,7 @@ async function runRbnMonitor(openFallback = false) {
   els.rbnRunBtn.disabled = true;
   els.rbnMeta.textContent = `Checking ${call}, last ${seconds >= 86400 ? "24 hours" : `${Math.round(seconds / 60)} min`}${distanceText ? `, ${distanceText}` : ""}...`;
   try {
-    const response = await fetch(`${rbnEndpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error(`RBN returned HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = await requestRbnPayload(params);
     const spots = parseRbnSpots(payload, call, distanceFilter, distanceMode);
     renderRbnMap(spots, call);
     renderRbnTable(spots);
@@ -934,8 +975,8 @@ async function runRbnMonitor(openFallback = false) {
   } catch (error) {
     renderRbnMap([], call);
     els.rbnTable.innerHTML = "";
-    els.rbnMeta.textContent = "RBN direct lookup blocked";
-    els.rbnSummary.innerHTML = `${error.message}. Browser CORS may block direct RBN JSON in the HTML version. <a href="${pageUrl}" target="_blank" rel="noopener">Open this callsign on Reverse Beacon Network</a>${distanceText ? `; apply the ${distanceText} filter in WSPRSpyDX when direct RBN data is available` : ""}.`;
+    els.rbnMeta.textContent = "RBN lookup unavailable";
+    els.rbnSummary.innerHTML = `${escapeHtml(error.message)}. <a href="${pageUrl}" target="_blank" rel="noopener">Open this callsign on Reverse Beacon Network</a>${distanceText ? `; apply the ${distanceText} filter when RBN data is available` : ""}.`;
   } finally {
     els.rbnRunBtn.disabled = false;
     clearInterval(rbnTimer);
