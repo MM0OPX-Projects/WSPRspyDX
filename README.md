@@ -6,7 +6,7 @@ The project is available in three formats:
 
 - **HTML/PWA dashboard**: [open WSPRSpyDX on GitHub Pages](https://mm0opx-projects.github.io/WSPRspyDX/). This is the recommended version for iPhone and iPad.
 - **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR and NOAA data. The CW RBN Monitor is available only in the Android app.
-- **Android APK**: `releases/WSPRSpyDX-v0.54-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.55-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
 
 ## Features
 
@@ -92,7 +92,7 @@ On iPhone or iPad, open the GitHub Pages URL in Safari. Do not open the `raw.git
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.54-debug.apk
+releases/WSPRSpyDX-v0.55-debug.apk
 ```
 
 To install it on Android:
@@ -118,7 +118,7 @@ The current test APK was built locally from this wrapper and the dashboard asset
 Build and validate a new test APK with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\build-apk.ps1 -VersionCode 54 -VersionName 0.54
+powershell -ExecutionPolicy Bypass -File .\tools\build-apk.ps1 -VersionCode 55 -VersionName 0.55
 ```
 
 The builder verifies that `classes.dex` is at the APK root, checks ZIP alignment, and verifies the APK signature before returning a release file.
@@ -140,12 +140,15 @@ The builder verifies that `classes.dex` is at the APK root, checks ZIP alignment
 |   `-- build-apk.ps1
 |-- android-apk/
 `-- releases/
-    `-- WSPRSpyDX-v0.54-debug.apk
+    `-- WSPRSpyDX-v0.55-debug.apk
 ```
 
 ## Notes
 
 - The HTML shell can load offline after caching, but propagation data requires internet access.
-- The 100 W and mode indicators are practical estimates, not guarantees of a QSO.
+- A 100 W estimate is `reported WSPR SNR + (50 dBm - reported TX power in dBm)`. Only protocol-valid WSPR powers from 0 to 60 dBm and SNR values from -50 to +50 dB are used for estimates.
+- Aggregated "best 100 W" figures select the SNR and power from the same reception with the strongest power-normalised result.
+- Mode thresholds use a 2500 Hz reference bandwidth: FT8 -20 dB, CW -12 dB, and just-usable SSB +7 dB.
+- The 100 W and mode indicators remain practical estimates, not guarantees of a QSO. They depend on accurate operator-reported power, comparable antennas, local noise, fading, and path reciprocity.
 - WSPR uses very low power and narrow-band reporting, so use the dashboard as a path reckoner rather than a definitive prediction engine.
 

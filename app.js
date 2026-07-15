@@ -70,6 +70,11 @@ const countryTimers = new Map();
 const bands = [1, 3, 5, 7, 10, 14, 18, 21, 24, 28, 50];
 const bandSqlList = bands.join(",");
 const liveRowLimit = 1200;
+const wsprPowerLevels = [0, 3, 7, 10, 13, 17, 20, 23, 27, 30, 33, 37, 40, 43, 47, 50, 53, 57, 60];
+const wsprPowerLevelSet = new Set(wsprPowerLevels);
+const validWsprSnrSql = "snr BETWEEN -50 AND 50";
+const validWsprEstimateSql = `power IN (${wsprPowerLevels.join(",")}) AND ${validWsprSnrSql}`;
+const modeThresholds = { ft8: -20, cw: -12, ssb: 7 };
 const spotDistanceKmExpr = "greatCircleDistance(tx_lon, tx_lat, rx_lon, rx_lat) / 1000";
 const validSpotCoordsSql = `
         AND tx_lat BETWEEN -90 AND 90
@@ -707,30 +712,31 @@ function renderLiveMap(focus, rows, minutes, flow, distanceFilter = 0, distanceM
   const removedRows = rows.length - enrichedRows.length;
   const hotBands = [...enrichedRows.reduce((map, row) => {
     const band = Number(row.band);
-    const current = map.get(band) || { band, spots: 0, workable: 0, bestRank: 0, bestSnr: -99, best100w: -99 };
+    const current = map.get(band) || { band, spots: 0, workable: 0, bestRank: 0, bestSnr: -Infinity, best100w: -Infinity };
     current.spots += 1;
     if (row.rank >= 1) current.workable += 1;
     current.bestRank = Math.max(current.bestRank, row.rank);
-    current.bestSnr = Math.max(current.bestSnr, Number(row.snr));
-    current.best100w = Math.max(current.best100w, row.snr100w);
+    if (validWsprSnr(row.snr)) current.bestSnr = Math.max(current.bestSnr, Number(row.snr));
+    if (Number.isFinite(row.snr100w)) current.best100w = Math.max(current.best100w, row.snr100w);
     map.set(band, current);
     return map;
   }, new Map()).values()]
     .sort((a, b) => b.spots - a.spots || b.bestSnr - a.bestSnr)
     .slice(0, 6);
   const hotCountries = [...enrichedRows.reduce((map, row) => {
-    const current = map.get(row.remoteCountry) || { country: row.remoteCountry, spots: 0, workable: 0, bestRank: 0, best100w: -99 };
+    const current = map.get(row.remoteCountry) || { country: row.remoteCountry, spots: 0, workable: 0, bestRank: 0, best100w: -Infinity };
     current.spots += 1;
     if (row.rank >= 1) current.workable += 1;
     current.bestRank = Math.max(current.bestRank, row.rank);
-    current.best100w = Math.max(current.best100w, row.snr100w);
+    if (Number.isFinite(row.snr100w)) current.best100w = Math.max(current.best100w, row.snr100w);
     map.set(row.remoteCountry, current);
     return map;
   }, new Map()).values()]
     .sort((a, b) => b.spots - a.spots || b.best100w - a.best100w)
     .slice(0, 6);
   const workableRows = enrichedRows.filter((row) => row.rank >= 1);
-  const best100w = Math.max(-99, ...enrichedRows.map((row) => row.snr100w));
+  const estimateRows = enrichedRows.filter((row) => Number.isFinite(row.snr100w));
+  const best100w = estimateRows.length ? Math.max(...estimateRows.map((row) => row.snr100w)) : NaN;
   const bestLiveRank = Math.max(0, ...enrichedRows.map((row) => row.rank));
   const maxSnr = Math.max(-30, ...enrichedRows.map((row) => Number(row.snr)));
   const minSnr = Math.min(10, ...enrichedRows.map((row) => Number(row.snr)));
@@ -751,7 +757,7 @@ function renderLiveMap(focus, rows, minutes, flow, distanceFilter = 0, distanceM
     return `
       <path class="live-route" style="--route-color:${color};--route-alpha:${alpha.toFixed(2)}" d="M ${focusPoint.x.toFixed(1)} ${focusPoint.y.toFixed(1)} Q ${midX.toFixed(1)} ${midY.toFixed(1)} ${remote.x.toFixed(1)} ${remote.y.toFixed(1)}"></path>
       <circle class="live-dot" style="--band-color:${color}" cx="${remote.x.toFixed(1)}" cy="${remote.y.toFixed(1)}" r="${Math.max(5, Math.min(13, 5 + alpha * 9)).toFixed(1)}">
-        <title>${row.remoteSign} ${row.remoteCountry} ${bandLabel(row.band)} ${Number(row.distance).toLocaleString()} km, ${row.snr} dB, 100W est ${row.snr100w.toFixed(0)} dB</title>
+        <title>${row.remoteSign} ${row.remoteCountry} ${bandLabel(row.band)} ${Number(row.distance).toLocaleString()} km, ${row.snr} dB, 100W est ${estimateText(row.snr100w)}</title>
       </circle>
       ${index < 10 ? `<text class="live-label" x="${Math.min(viewWidth - 230, Math.max(24, remote.x + 13)).toFixed(1)}" y="${Math.min(viewHeight - 28, Math.max(32, remote.y - 9)).toFixed(1)}">${bandLabel(row.band)}</text>` : ""}
     `;
@@ -775,11 +781,13 @@ function renderLiveMap(focus, rows, minutes, flow, distanceFilter = 0, distanceM
       <span>${spotCountText(item.spots)} &middot; ${compactModeLabel(item.bestRank)}</span>
     </button>
   `).join("") : `<span class="live-band-empty">No hot countries in this window.</span>`;
-  els.livePower.textContent = enrichedRows.length
-    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${enrichedRows.length.toLocaleString()} mapped spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${best100w >= 0 ? "+" : ""}${best100w.toFixed(0)} dB.`
-    : "100W estimate waiting for live spots.";
+  els.livePower.textContent = estimateRows.length
+    ? `100W estimate: ${workableRows.length.toLocaleString()} of ${estimateRows.length.toLocaleString()} valid mapped spots reach at least FT8; strongest live mode ${compactModeLabel(bestLiveRank)}; best estimate ${estimateText(best100w)}.`
+    : enrichedRows.length
+      ? "100W estimate unavailable: these mapped spots have invalid or unavailable WSPR power/SNR reports."
+      : "100W estimate waiting for live spots.";
   els.liveSummary.textContent = enrichedRows.length
-    ? `Farthest displayed spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${Number(enrichedRows[0].distance).toLocaleString()} km, ${enrichedRows[0].snr} dB, 100W est ${enrichedRows[0].snr100w >= 0 ? "+" : ""}${enrichedRows[0].snr100w.toFixed(0)} dB.`
+    ? `Farthest displayed spot ${enrichedRows[0].tx_sign} to ${enrichedRows[0].rx_sign} on ${bandLabel(enrichedRows[0].band)}, ${Number(enrichedRows[0].distance).toLocaleString()} km, ${enrichedRows[0].snr} dB, 100W est ${estimateText(enrichedRows[0].snr100w)}.`
     : `No geolocated live WSPR spots found for ${focus.name}${filterText ? ` with ${filterText}` : ""} in the last ${minutes} minutes.`;
   if (removedRows > 0 && enrichedRows.length) {
     els.liveSummary.textContent += ` Removed ${removedRows.toLocaleString()} spot${removedRows === 1 ? "" : "s"} without usable station geography.`;
@@ -1065,15 +1073,33 @@ async function runRbnMonitor(openFallback = false) {
 }
 
 function scaledSnr(snr, powerDbm) {
-  const cleanSnr = Number(snr);
+  if (!validWsprSnr(snr) || powerDbm == null || String(powerDbm).trim() === "") return NaN;
   const cleanPower = Number(powerDbm);
-  if (!Number.isFinite(cleanSnr) || !Number.isFinite(cleanPower)) return NaN;
-  return cleanSnr + (50 - cleanPower);
+  if (!wsprPowerLevelSet.has(cleanPower)) return NaN;
+  return Number(snr) + (50 - cleanPower);
+}
+
+function validWsprSnr(value) {
+  if (value == null || String(value).trim() === "") return false;
+  const snr = Number(value);
+  return Number.isFinite(snr) && snr >= -50 && snr <= 50;
+}
+
+function estimateText(value, unavailable = "unavailable") {
+  if (value == null || String(value).trim() === "") return unavailable;
+  const estimate = Number(value);
+  if (!Number.isFinite(estimate)) return unavailable;
+  return `${estimate >= 0 ? "+" : ""}${estimate.toFixed(0)} dB`;
+}
+
+function powerText(value) {
+  if (value == null || String(value).trim() === "" || !wsprPowerLevelSet.has(Number(value))) return "unavailable";
+  return `${Number(value).toFixed(0)} dBm`;
 }
 
 function powerScaleNote(powerDbm) {
   const cleanPower = Number(powerDbm);
-  if (!Number.isFinite(cleanPower)) return "reported power unavailable";
+  if (powerDbm == null || String(powerDbm).trim() === "" || !wsprPowerLevelSet.has(cleanPower)) return "reported power invalid or unavailable";
   if (cleanPower === 50) return "reported at 100W";
   if (cleanPower < 50) return `scaled up from ${cleanPower} dBm to 50 dBm`;
   return `scaled down from ${cleanPower} dBm to 50 dBm`;
@@ -1081,17 +1107,17 @@ function powerScaleNote(powerDbm) {
 
 function modeText(snr100w) {
   return [
-    { name: "FT8", ok: snr100w >= -20 },
-    { name: "CW", ok: snr100w >= -12 },
-    { name: "SSB", ok: snr100w >= 6 }
+    { name: "FT8", ok: snr100w >= modeThresholds.ft8 },
+    { name: "CW", ok: snr100w >= modeThresholds.cw },
+    { name: "SSB", ok: snr100w >= modeThresholds.ssb }
   ];
 }
 
 function modeRank(snr100w) {
-  if (Number.isNaN(Number(snr100w))) return 0;
-  if (snr100w >= 6) return 3;
-  if (snr100w >= -12) return 2;
-  if (snr100w >= -20) return 1;
+  if (snr100w == null || String(snr100w).trim() === "" || !Number.isFinite(Number(snr100w))) return 0;
+  if (snr100w >= modeThresholds.ssb) return 3;
+  if (snr100w >= modeThresholds.cw) return 2;
+  if (snr100w >= modeThresholds.ft8) return 1;
   return 0;
 }
 
@@ -1111,10 +1137,10 @@ function compactModeLabel(rank) {
 }
 
 function scaledText(snr, powerDbm) {
-  if (Number.isNaN(Number(snr)) || Number.isNaN(Number(powerDbm))) return "100W estimate unavailable";
   const estimate = scaledSnr(snr, powerDbm);
+  if (!Number.isFinite(estimate)) return "100W estimate unavailable";
   return `
-    <span class="estimate">100W est ${estimate >= 0 ? "+" : ""}${estimate.toFixed(0)} dB</span>
+    <span class="estimate">100W est ${estimateText(estimate)}</span>
     <span class="estimate power-note">${powerScaleNote(powerDbm)}</span>
     ${modeText(estimate).map((mode) => `<span class="mode-chip ${mode.ok ? "ok" : "no"}">${mode.name}</span>`).join("")}
   `;
@@ -1474,8 +1500,9 @@ function aggregateSummaryRows(rows, context) {
       ? Number(clean.snr_sum)
       : Number(clean.snr) * receptionCount;
     bucket.countries.add(`${clean.txCountry} to ${clean.rxCountry}`);
-    if (Number(clean.snr) > bucket.best_snr) {
-      bucket.best_snr = Number(clean.snr);
+    const rawBestSnr = Number(clean.best_raw_snr == null ? clean.snr : clean.best_raw_snr);
+    if (Number.isFinite(rawBestSnr) && rawBestSnr > bucket.best_snr) {
+      bucket.best_snr = rawBestSnr;
       bucket.best_power = Number(clean.power);
     }
     buckets.set(key, bucket);
@@ -1630,8 +1657,9 @@ function summaryCandidateSqlFor(context, distanceFilter = 0, distanceMode = "min
         round(max(${spotDistanceKmExpr}), 1) AS distance,
         count() AS spot_count,
         sum(snr) AS snr_sum,
-        max(snr) AS detail_snr,
-        argMax(power, snr) AS detail_power
+        if(countIf(${validWsprSnrSql}) > 0, maxIf(snr, ${validWsprSnrSql}), NULL) AS best_raw_snr,
+        if(countIf(${validWsprEstimateSql}) > 0, argMaxIf(snr, snr - power, ${validWsprEstimateSql}), NULL) AS detail_snr,
+        if(countIf(${validWsprEstimateSql}) > 0, argMaxIf(power, snr - power, ${validWsprEstimateSql}), NULL) AS detail_power
       FROM wspr.rx
       WHERE ${sinceOverride} AND band IN (${bandSqlList}) AND ${context.where}
         AND tx_loc != ''
@@ -1691,8 +1719,9 @@ function bandSpotSqlFor(context, band, startHour, minDistance = 0, durationHours
         argMax(rx_lat, time) AS detail_rx_lat,
         argMax(rx_lon, time) AS detail_rx_lon,
         round(max(${spotDistanceKmExpr}), 1) AS detail_distance,
-        max(snr) AS detail_snr,
-        argMax(power, snr + (50 - power)) AS detail_power
+        if(countIf(${validWsprSnrSql}) > 0, maxIf(snr, ${validWsprSnrSql}), NULL) AS best_raw_snr,
+        if(countIf(${validWsprEstimateSql}) > 0, argMaxIf(snr, snr - power, ${validWsprEstimateSql}), NULL) AS detail_snr,
+        if(countIf(${validWsprEstimateSql}) > 0, argMaxIf(power, snr - power, ${validWsprEstimateSql}), NULL) AS detail_power
       FROM wspr.rx
       WHERE ${context.since}
         AND ${context.where}
@@ -1760,8 +1789,9 @@ function summariseStationPairs(rows) {
     current.bands.add(Number(row.band));
     current.countries.add(`${row.txCountry} to ${row.rxCountry}`);
     current.maxDistance = Math.max(current.maxDistance, Number(row.distance) || 0);
-    current.bestSnr = Math.max(current.bestSnr, Number(row.snr) || -Infinity);
-    current.best100w = Math.max(current.best100w, snr100w);
+    const rowSnr = Number(row.best_raw_snr == null ? row.snr : row.best_raw_snr);
+    if (validWsprSnr(rowSnr)) current.bestSnr = Math.max(current.bestSnr, rowSnr);
+    if (Number.isFinite(snr100w)) current.best100w = Math.max(current.best100w, snr100w);
     current.mode = Math.max(current.mode, modeRank(snr100w));
     if (timeValue >= current.latestValue) {
       current.latestValue = timeValue;
@@ -1772,7 +1802,7 @@ function summariseStationPairs(rows) {
   return [...pairs.values()].sort((a, b) =>
     b.maxDistance - a.maxDistance ||
     b.count - a.count ||
-    b.best100w - a.best100w ||
+    (Number.isFinite(b.best100w) ? b.best100w : -1000000) - (Number.isFinite(a.best100w) ? a.best100w : -1000000) ||
     b.latestValue - a.latestValue
   );
 }
@@ -1801,7 +1831,7 @@ function renderBandSpotDetails(band, startHour, rows, minDistance, durationHours
     const snr100w = scaledSnr(row.snr, row.power);
     const current = map.get(country) || { country, spots: 0, best: -Infinity, mode: 0 };
     current.spots += 1;
-    current.best = Math.max(current.best, snr100w);
+    if (Number.isFinite(snr100w)) current.best = Math.max(current.best, snr100w);
     current.mode = Math.max(current.mode, modeRank(snr100w));
     map.set(country, current);
     return map;
@@ -1809,7 +1839,7 @@ function renderBandSpotDetails(band, startHour, rows, minDistance, durationHours
   els.bandCountrySummary.innerHTML = countries.length ? countries.map((item) => `
     <span class="live-country-chip">
       <b>${escapeHtml(item.country)}</b>
-      <span>${spotCountText(item.spots)} · ${compactModeLabel(item.mode)} · best ${item.best >= 0 ? "+" : ""}${item.best.toFixed(0)} dB</span>
+      <span>${spotCountText(item.spots)} · ${compactModeLabel(item.mode)} · best ${estimateText(item.best)}</span>
     </span>
   `).join("") : `<span class="live-band-empty">No country summary for this window.</span>`;
   els.bandSpotTable.innerHTML = rows.length ? `
@@ -1825,8 +1855,8 @@ function renderBandSpotDetails(band, startHour, rows, minDistance, durationHours
           <td>${escapeHtml(row.txCountry)} -&gt; ${escapeHtml(row.rxCountry)}</td>
           <td>${Math.round(Number(row.distance)).toLocaleString()} km</td>
           <td>${Number(row.snr).toFixed(0)} dB</td>
-          <td>${Number(row.power).toFixed(0)} dBm</td>
-          <td>${snr100w >= 0 ? "+" : ""}${snr100w.toFixed(0)} dB</td>
+          <td>${powerText(row.power)}</td>
+          <td>${estimateText(snr100w)}</td>
           <td>${compactModeLabel(modeRank(snr100w))}</td>
         </tr>
       `;
@@ -1852,7 +1882,7 @@ function renderBandPairDetails(band, startHour, rows, distanceFilter, distanceMo
     const snr100w = scaledSnr(row.snr, row.power);
     const current = map.get(country) || { country, spots: 0, best: -Infinity, mode: 0 };
     current.spots += Number(row.spot_count) || 1;
-    current.best = Math.max(current.best, snr100w);
+    if (Number.isFinite(snr100w)) current.best = Math.max(current.best, snr100w);
     current.mode = Math.max(current.mode, modeRank(snr100w));
     map.set(country, current);
     return map;
@@ -1860,7 +1890,7 @@ function renderBandPairDetails(band, startHour, rows, distanceFilter, distanceMo
   els.bandCountrySummary.innerHTML = countries.length ? countries.map((item) => `
     <button type="button" class="live-country-chip live-detail-trigger utc-country-trigger" data-utc-country="${escapeHtml(item.country)}" aria-expanded="false">
       <b>${escapeHtml(item.country)}</b>
-      <span>${spotCountText(item.spots)} &middot; ${compactModeLabel(item.mode)} &middot; best ${item.best >= 0 ? "+" : ""}${item.best.toFixed(0)} dB</span>
+      <span>${spotCountText(item.spots)} &middot; ${compactModeLabel(item.mode)} &middot; best ${estimateText(item.best)}</span>
     </button>
   `).join("") : `<span class="live-band-empty">No country summary for this window.</span>`;
   renderUtcPairTable(pairs);
