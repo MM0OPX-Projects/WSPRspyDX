@@ -195,7 +195,12 @@ const els = {
   bCountryOptions: document.querySelector("#bCountryOptions"),
   bSuggestions: document.querySelector("#bSuggestions"),
   modeNote: document.querySelector("#modeNote"),
+  historyMode: document.querySelector("#historyMode"),
   period: document.querySelector("#period"),
+  recentHistoryFields: document.querySelector("#recentHistoryFields"),
+  rangeHistoryFields: document.querySelector("#rangeHistoryFields"),
+  historyStart: document.querySelector("#historyStart"),
+  historyEnd: document.querySelector("#historyEnd"),
   direction: document.querySelector("#direction"),
   liveWindow: document.querySelector("#liveWindow"),
   liveDirection: document.querySelector("#liveDirection"),
@@ -376,6 +381,81 @@ function liveWorkability(row) {
 function setStatus(message, isError = false) {
   els.status.textContent = message;
   els.status.classList.toggle("error", isError);
+}
+
+function utcInputValue(date) {
+  return date.toISOString().slice(0, 16);
+}
+
+function initialiseCustomHistoryRange() {
+  if (els.historyStart.value && els.historyEnd.value) return;
+  const end = new Date();
+  end.setUTCSeconds(0, 0);
+  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  els.historyStart.value = utcInputValue(start);
+  els.historyEnd.value = utcInputValue(end);
+}
+
+function updateHistoryModeUi() {
+  const mode = els.historyMode.value === "range" ? "range" : "recent";
+  els.historyMode.value = mode;
+  els.recentHistoryFields.hidden = mode !== "recent";
+  els.rangeHistoryFields.hidden = mode !== "range";
+  document.querySelectorAll(".history-mode-button").forEach((button) => {
+    const active = button.dataset.historyMode === mode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function parseUtcHistoryInput(value, label) {
+  const clean = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(clean)) {
+    throw new Error(`Choose a valid ${label} date and time in UTC.`);
+  }
+  const date = new Date(`${clean}${clean.length === 16 ? ":00" : ""}Z`);
+  if (Number.isNaN(date.getTime())) throw new Error(`Choose a valid ${label} date and time in UTC.`);
+  return date;
+}
+
+function clickhouseUtc(date) {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+function displayUtcRangeDate(date) {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${String(date.getUTCDate()).padStart(2, "0")} ${months[date.getUTCMonth()]} ${date.getUTCFullYear()} ${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+function historyQuerySpec() {
+  if (els.historyMode.value !== "range") {
+    const days = Math.min(90, Math.max(1, Number(els.period.value)));
+    const dayText = `${days} ${days === 1 ? "day" : "days"}`;
+    return {
+      mode: "recent",
+      days,
+      since: `time >= now() - INTERVAL ${days} DAY`,
+      label: `previous ${dayText}`,
+      statusLabel: `the previous ${dayText}`
+    };
+  }
+
+  const start = parseUtcHistoryInput(els.historyStart.value, "start");
+  const end = parseUtcHistoryInput(els.historyEnd.value, "end");
+  if (end.getTime() <= start.getTime()) throw new Error("The history end must be later than the start.");
+  const durationMs = end.getTime() - start.getTime();
+  const maxRangeMs = 90 * 24 * 60 * 60 * 1000;
+  if (durationMs > maxRangeMs) throw new Error("Select a history range of 90 days or less.");
+  const label = `${displayUtcRangeDate(start)} to ${displayUtcRangeDate(end)} UTC`;
+  return {
+    mode: "range",
+    days: durationMs / (24 * 60 * 60 * 1000),
+    startMs: start.getTime(),
+    endMs: end.getTime(),
+    since: `time >= toDateTime('${clickhouseUtc(start)}', 'UTC') AND time < toDateTime('${clickhouseUtc(end)}', 'UTC')`,
+    label,
+    statusLabel: label
+  };
 }
 
 function boundingBox(boxes) {
@@ -1564,11 +1644,21 @@ function summaryCandidateSqlFor(context, distanceFilter = 0, distanceMode = "min
       LIMIT 80000`;
 }
 
-function summaryTimeWindows(days) {
-  const totalDays = Math.max(1, Number(days) || 1);
+function summaryTimeWindows(context) {
+  const totalDays = Math.max(1 / 24, Number(context.days) || 1);
   const totalHours = Math.ceil(totalDays * 24);
   const chunkHours = totalDays <= 10 ? 6 : totalDays <= 30 ? 12 : 24;
   const windows = [];
+  if (context.historyMode === "range") {
+    const chunkMs = chunkHours * 60 * 60 * 1000;
+    for (let startMs = context.startMs; startMs < context.endMs; startMs += chunkMs) {
+      const endMs = Math.min(context.endMs, startMs + chunkMs);
+      const start = clickhouseUtc(new Date(startMs));
+      const end = clickhouseUtc(new Date(endMs));
+      windows.push(`time >= toDateTime('${start}', 'UTC') AND time < toDateTime('${end}', 'UTC')`);
+    }
+    return windows;
+  }
   for (let start = 0; start < totalHours; start += chunkHours) {
     const end = Math.min(totalHours, start + chunkHours);
     windows.push(`time >= now() - INTERVAL ${end} HOUR AND time < now() - INTERVAL ${start} HOUR`);
@@ -1577,7 +1667,7 @@ function summaryTimeWindows(days) {
 }
 
 async function runSummaryCandidateQueries(context, distanceFilter = 0, distanceMode = "min") {
-  const windows = summaryTimeWindows(context.days);
+  const windows = summaryTimeWindows(context);
   const chunks = [];
   for (const windowWhere of windows) {
     const rows = await runQuery(summaryCandidateSqlFor(context, distanceFilter, distanceMode, windowWhere));
@@ -1858,16 +1948,24 @@ async function run() {
     await resolveCurrentInputs(false);
     const a = readBox("a");
     const b = isAnywhereTarget("b") ? null : readBox("b");
-    const days = Math.min(90, Math.max(1, Number(els.period.value)));
+    const history = historyQuerySpec();
     const where = pathWhere(a, b);
-    const since = `time >= now() - INTERVAL ${days} DAY`;
     const pathLabel = b ? `${a.name} to ${b.name}` : `${a.name} to anywhere`;
 
-    setStatus(`Querying ${pathLabel} over ${days} days...`);
+    setStatus(`Querying ${pathLabel} for ${history.statusLabel}...`);
     els.runBtn.disabled = true;
     els.refreshBtn.disabled = true;
 
-    currentQueryContext = { a, b, days, where, since };
+    currentQueryContext = {
+      a,
+      b,
+      days: history.days,
+      where,
+      since: history.since,
+      historyMode: history.mode,
+      startMs: history.startMs,
+      endMs: history.endMs
+    };
 
     const pathMinDistance = cleanDistanceInput(els.pathMinDistance);
     const pathDistanceMode = distanceModeFor(els.pathDistanceMode);
@@ -1883,7 +1981,7 @@ async function run() {
     renderHeatmap(summary);
     runLiveMap();
     const pathDistanceText = distanceFilterText(pathDistanceMode, pathMinDistance, true);
-    els.queryMeta.textContent = `${pathLabel}, ${days} days${pathDistanceText ? `, ${pathDistanceText}` : ""}`;
+    els.queryMeta.textContent = `${pathLabel}, ${history.label}${pathDistanceText ? `, ${pathDistanceText}` : ""}`;
     setStatus(`Found ${summary.reduce((sum, row) => sum + Number(row.spots), 0).toLocaleString()} confirmed spots across ${summary.length} band/hour slots.`);
   } catch (error) {
     setStatus(error.message, true);
@@ -1936,7 +2034,10 @@ function modeHelpText() {
 function savePathSettings() {
   try {
     localStorage.setItem(pathSettingsKey, JSON.stringify({
+      historyMode: els.historyMode.value,
       period: els.period.value,
+      historyStart: els.historyStart.value,
+      historyEnd: els.historyEnd.value,
       aMode: els.aMode.value,
       aCountry: els.aCountry.value,
       bMode: els.bMode.value,
@@ -1952,7 +2053,10 @@ function restorePathSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(pathSettingsKey) || "null");
     if (!saved || typeof saved !== "object") return false;
+    els.historyMode.value = saved.historyMode === "range" ? "range" : "recent";
     if (saved.period) els.period.value = saved.period;
+    if (saved.historyStart) els.historyStart.value = saved.historyStart;
+    if (saved.historyEnd) els.historyEnd.value = saved.historyEnd;
     if (saved.aMode) els.aMode.value = saved.aMode;
     if (saved.bMode) els.bMode.value = saved.bMode;
     if (saved.direction) els.direction.value = saved.direction;
@@ -2084,6 +2188,16 @@ els.pathMinDistance.addEventListener("keydown", (event) => {
   if (event.key === "Enter") run();
 });
 els.period.addEventListener("change", savePathSettings);
+els.historyStart.addEventListener("change", savePathSettings);
+els.historyEnd.addEventListener("change", savePathSettings);
+document.querySelectorAll(".history-mode-button").forEach((button) => {
+  button.addEventListener("click", () => {
+    els.historyMode.value = button.dataset.historyMode === "range" ? "range" : "recent";
+    initialiseCustomHistoryRange();
+    updateHistoryModeUi();
+    savePathSettings();
+  });
+});
 els.direction.addEventListener("change", savePathSettings);
 els.pathMinDistance.addEventListener("change", savePathSettings);
 document.querySelectorAll(".distance-mode-button").forEach((button) => {
@@ -2168,7 +2282,9 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
+initialiseCustomHistoryRange();
 const hasSavedPathSettings = restorePathSettings();
+updateHistoryModeUi();
 if (navigator.userAgent.includes("WSPRSpyDX-Android")) {
   els.rbnCard.hidden = false;
 } else {

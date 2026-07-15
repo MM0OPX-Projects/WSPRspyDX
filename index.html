@@ -9,7 +9,7 @@
     body{margin:0;min-height:100vh;background:#0b1220;color:#eef5ff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1200px;margin:auto;padding:18px 14px}.appHeader,.card,.panel,.status{background:#111b2f;border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:16px;margin-bottom:14px}.grid{display:grid;gap:14px}select,input,button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:#0d1729;color:#eef5ff;font:inherit}.title h1{font-size:clamp(2rem,6vw,3.35rem);margin:0}
   </style>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=75">
+  <link rel="stylesheet" href="styles.css?v=79">
 </head>
 <body>
   <main class="wrap">
@@ -24,19 +24,39 @@
         </div>
       </div>
       <div class="selectors" aria-label="Path controls">
-        <div class="selectBox">
-          <label for="period">History</label>
-          <select id="period">
-            <option value="1">1 day</option>
-            <option value="2">2 days</option>
-            <option value="3">3 days</option>
-            <option value="4">4 days</option>
-            <option value="5">5 days</option>
-            <option value="10">10 days</option>
-            <option value="20">20 days</option>
-            <option value="30">30 days</option>
-            <option value="90" selected>90 days</option>
-          </select>
+        <div class="selectBox historyBox">
+          <label>History</label>
+          <div class="history-controls">
+            <input id="historyMode" type="hidden" value="recent">
+            <div class="history-toggle" role="group" aria-label="History time selection mode">
+              <button class="history-mode-button active" type="button" data-history-mode="recent" aria-pressed="true">Previous days</button>
+              <button class="history-mode-button" type="button" data-history-mode="range" aria-pressed="false">Date range</button>
+            </div>
+            <div class="history-fields" id="recentHistoryFields">
+              <label for="period">Period</label>
+              <select id="period">
+                <option value="1">1 day</option>
+                <option value="2">2 days</option>
+                <option value="3">3 days</option>
+                <option value="4">4 days</option>
+                <option value="5">5 days</option>
+                <option value="10">10 days</option>
+                <option value="20">20 days</option>
+                <option value="30">30 days</option>
+                <option value="90" selected>90 days</option>
+              </select>
+            </div>
+            <div class="history-range-fields" id="rangeHistoryFields" hidden>
+              <div class="history-fields">
+                <label for="historyStart">Start UTC</label>
+                <input id="historyStart" type="datetime-local" step="60" aria-label="History start date and time in UTC">
+              </div>
+              <div class="history-fields">
+                <label for="historyEnd">End UTC</label>
+                <input id="historyEnd" type="datetime-local" step="60" aria-label="History end date and time in UTC">
+              </div>
+            </div>
+          </div>
         </div>
         <div class="selectBox">
           <label for="aMode">Region A type</label>
@@ -269,6 +289,6 @@
       100W estimates scale WSPR SNR by reported TX power. Created by Colin Summers, MM0OPX.
     </footer>
   </main>
-  <script src="app.js?v=77"></script>
+  <script src="app.js?v=79"></script>
 </body>
 </html>

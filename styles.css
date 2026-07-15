@@ -104,6 +104,73 @@ body {
   background: rgba(6,12,24,.38);
 }
 
+.historyBox {
+  grid-column: 1 / -1;
+}
+
+.history-controls {
+  display: grid;
+  grid-template-columns: minmax(230px, .7fr) minmax(180px, .45fr) minmax(430px, 1.35fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.history-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 12px;
+  background: rgba(5,13,25,.48);
+}
+
+.history-toggle .history-mode-button {
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 900;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.history-toggle .history-mode-button.active {
+  background: var(--blue);
+  color: #06111f;
+  box-shadow: 0 2px 8px rgba(73,167,255,.26);
+}
+
+.history-fields {
+  min-width: 0;
+}
+
+.history-fields label {
+  margin-bottom: 5px;
+}
+
+.history-range-fields {
+  display: grid;
+  grid-column: 2 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.history-range-fields[hidden],
+.history-fields[hidden] {
+  display: none;
+}
+
+.history-range-fields input {
+  min-width: 0;
+  color-scheme: dark;
+}
+
 .selectBox label,
 label span,
 legend,
@@ -1006,6 +1073,16 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .history-controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .history-range-fields {
+    grid-column: 1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .mapCard,
   .liveMapCard,
   .rbnCard,
@@ -1071,6 +1148,14 @@ h2 {
   .title p,
   .modeNote {
     font-size: .92rem;
+  }
+
+  .history-range-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .history-toggle .history-mode-button {
+    font-size: .78rem;
   }
 
   .score-strip {

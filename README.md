@@ -6,7 +6,7 @@ The project is available in three formats:
 
 - **HTML/PWA dashboard**: [open WSPRSpyDX on GitHub Pages](https://mm0opx-projects.github.io/WSPRspyDX/). This is the recommended version for iPhone and iPad.
 - **Single-file HTML dashboard**: `WSPRSpyDX-standalone.html` contains the interface, code, icon and map in one transferable file. Internet access is still required for live WSPR and NOAA data. The CW RBN Monitor is available only in the Android app.
-- **Android APK**: `releases/WSPRSpyDX-v0.53-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
+- **Android APK**: `releases/WSPRSpyDX-v0.54-debug.apk` is a debug-signed test build that bundles the dashboard and Android-only CW RBN Monitor inside a small Android WebView app.
 
 ## Features
 
@@ -16,7 +16,7 @@ The project is available in three formats:
 - Adds path modes for country/region, CQ zone, ITU zone, and Maidenhead locator searches.
 - Supports multiple target zones or locators, for example `14` to `1,2`.
 - Includes shortcuts for Scotland, New Zealand, USA East Coast, USA West Coast, and other common regions.
-- Supports history windows from recent days up to longer lookbacks.
+- Supports recent-day history presets or an exact UTC start and end date/time, up to 90 days per query.
 - Shows best bands and best UTC operating windows by band.
 - Lets you tap a populated UTC Window cell to inspect matching WSPR spots, likely countries, distances, SNR, power, and 100 W mode estimates.
 - Adds independently selectable minimum/maximum-distance filters for UTC Windows, Live Openings, and the CW Reverse Beacon Network monitor.
@@ -92,7 +92,7 @@ On iPhone or iPad, open the GitHub Pages URL in Safari. Do not open the `raw.git
 The test APK is:
 
 ```text
-releases/WSPRSpyDX-v0.53-debug.apk
+releases/WSPRSpyDX-v0.54-debug.apk
 ```
 
 To install it on Android:
@@ -118,7 +118,7 @@ The current test APK was built locally from this wrapper and the dashboard asset
 Build and validate a new test APK with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\build-apk.ps1 -VersionCode 53 -VersionName 0.53
+powershell -ExecutionPolicy Bypass -File .\tools\build-apk.ps1 -VersionCode 54 -VersionName 0.54
 ```
 
 The builder verifies that `classes.dex` is at the APK root, checks ZIP alignment, and verifies the APK signature before returning a release file.
@@ -140,7 +140,7 @@ The builder verifies that `classes.dex` is at the APK root, checks ZIP alignment
 |   `-- build-apk.ps1
 |-- android-apk/
 `-- releases/
-    `-- WSPRSpyDX-v0.53-debug.apk
+    `-- WSPRSpyDX-v0.54-debug.apk
 ```
 
 ## Notes
